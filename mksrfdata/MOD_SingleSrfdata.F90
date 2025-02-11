@@ -53,6 +53,7 @@ MODULE MOD_SingleSrfdata
    real(r8), allocatable :: SITE_soil_vf_quartz_mineral (:)
    real(r8), allocatable :: SITE_soil_vf_gravels        (:)
    real(r8), allocatable :: SITE_soil_vf_sand           (:)
+   real(r8), allocatable :: SITE_soil_vf_clay           (:)
    real(r8), allocatable :: SITE_soil_vf_om             (:)
    real(r8), allocatable :: SITE_soil_wf_gravels        (:)
    real(r8), allocatable :: SITE_soil_wf_sand           (:)
@@ -75,8 +76,8 @@ MODULE MOD_SingleSrfdata
 #endif
    real(r8), allocatable :: SITE_soil_BA_alpha          (:)
    real(r8), allocatable :: SITE_soil_BA_beta           (:)
-   
-   integer,  allocatable :: SITE_soil_texture           (:)
+
+   integer :: SITE_soil_texture
 
    real(r8) :: SITE_dbedrock = 0.
 
@@ -257,6 +258,7 @@ CONTAINS
          CALL ncio_read_serial (fsrfdata, 'soil_vf_quartz_mineral', SITE_soil_vf_quartz_mineral)
          CALL ncio_read_serial (fsrfdata, 'soil_vf_gravels       ', SITE_soil_vf_gravels       )
          CALL ncio_read_serial (fsrfdata, 'soil_vf_sand          ', SITE_soil_vf_sand          )
+         CALL ncio_read_serial (fsrfdata, 'soil_vf_clay          ', SITE_soil_vf_clay          )
          CALL ncio_read_serial (fsrfdata, 'soil_vf_om            ', SITE_soil_vf_om            )
          CALL ncio_read_serial (fsrfdata, 'soil_wf_gravels       ', SITE_soil_wf_gravels       )
          CALL ncio_read_serial (fsrfdata, 'soil_wf_sand          ', SITE_soil_wf_sand          )
@@ -276,12 +278,14 @@ CONTAINS
          CALL ncio_read_serial (fsrfdata, 'soil_alpha_vgm        ', SITE_soil_alpha_vgm        )
          CALL ncio_read_serial (fsrfdata, 'soil_L_vgm            ', SITE_soil_L_vgm            )
          CALL ncio_read_serial (fsrfdata, 'soil_n_vgm            ', SITE_soil_n_vgm            )
-#else
-         !SITE_soil_theta_r(:) = 0.
 #endif
          CALL ncio_read_serial (fsrfdata, 'soil_BA_alpha         ', SITE_soil_BA_alpha         )
          CALL ncio_read_serial (fsrfdata, 'soil_BA_beta          ', SITE_soil_BA_beta          )
-         CALL ncio_read_serial (fsrfdata, 'soil_texture          ', SITE_soil_texture          )
+
+         IF (DEF_Runoff_SCHEME == 3) THEN ! for Simple VIC
+            ! reading from global dataset currently
+            !CALL ncio_read_serial (fsrfdata, 'soil_texture       ', SITE_soil_texture          )
+         ENDIF
       ENDIF
 
       IF (DEF_USE_BEDROCK) THEN
@@ -439,6 +443,7 @@ ENDIF
          CALL ncio_read_serial (fsrfdata, 'soil_vf_quartz_mineral', SITE_soil_vf_quartz_mineral)
          CALL ncio_read_serial (fsrfdata, 'soil_vf_gravels       ', SITE_soil_vf_gravels       )
          CALL ncio_read_serial (fsrfdata, 'soil_vf_sand          ', SITE_soil_vf_sand          )
+         CALL ncio_read_serial (fsrfdata, 'soil_vf_clay          ', SITE_soil_vf_clay          )
          CALL ncio_read_serial (fsrfdata, 'soil_vf_om            ', SITE_soil_vf_om            )
          CALL ncio_read_serial (fsrfdata, 'soil_wf_gravels       ', SITE_soil_wf_gravels       )
          CALL ncio_read_serial (fsrfdata, 'soil_wf_sand          ', SITE_soil_wf_sand          )
@@ -463,7 +468,10 @@ ENDIF
 #endif
          CALL ncio_read_serial (fsrfdata, 'soil_BA_alpha         ', SITE_soil_BA_alpha         )
          CALL ncio_read_serial (fsrfdata, 'soil_BA_beta          ', SITE_soil_BA_beta          )
-         CALL ncio_read_serial (fsrfdata, 'soil_texture          ', SITE_soil_texture          )
+
+         IF (DEF_Runoff_SCHEME == 3) THEN ! for Simple VIC
+            CALL ncio_read_serial (fsrfdata, 'soil_texture       ', SITE_soil_texture          )
+         ENDIF
       ENDIF
 
       IF (DEF_USE_BEDROCK) THEN
@@ -598,6 +606,7 @@ ENDIF
       CALL ncio_write_serial (fsrfdata, 'soil_vf_quartz_mineral', SITE_soil_vf_quartz_mineral, 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_vf_gravels       ', SITE_soil_vf_gravels       , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_vf_sand          ', SITE_soil_vf_sand          , 'soil')
+      CALL ncio_write_serial (fsrfdata, 'soil_vf_clay          ', SITE_soil_vf_clay          , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_vf_om            ', SITE_soil_vf_om            , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_wf_gravels       ', SITE_soil_wf_gravels       , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_wf_sand          ', SITE_soil_wf_sand          , 'soil')
@@ -613,6 +622,7 @@ ENDIF
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_quartz_mineral', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_gravels       ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_sand          ', 'source', source)
+      CALL ncio_put_attr     (fsrfdata, 'soil_vf_clay          ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_om            ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_wf_gravels       ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_wf_sand          ', 'source', source)
@@ -643,9 +653,11 @@ ENDIF
       CALL ncio_write_serial (fsrfdata, 'soil_BA_beta ', SITE_soil_BA_beta , 'soil')
       CALL ncio_put_attr     (fsrfdata, 'soil_BA_alpha', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_BA_beta ', 'source', source)
-      
-      CALL ncio_write_serial (fsrfdata, 'soil_texture ', SITE_soil_texture, 'soil')
-      CALL ncio_put_attr     (fsrfdata, 'soil_texture ', 'source', source)
+
+      IF (DEF_Runoff_SCHEME == 3) THEN ! for Simple VIC
+         CALL ncio_write_serial (fsrfdata, 'soil_texture ', SITE_soil_texture)
+         CALL ncio_put_attr     (fsrfdata, 'soil_texture ', 'source', source)
+      ENDIF
 
       IF(DEF_USE_BEDROCK)THEN
          CALL ncio_write_serial (fsrfdata, 'depth_to_bedrock', SITE_dbedrock)
@@ -796,6 +808,7 @@ ENDIF
       CALL ncio_write_serial (fsrfdata, 'soil_vf_quartz_mineral', SITE_soil_vf_quartz_mineral, 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_vf_gravels       ', SITE_soil_vf_gravels       , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_vf_sand          ', SITE_soil_vf_sand          , 'soil')
+      CALL ncio_write_serial (fsrfdata, 'soil_vf_clay          ', SITE_soil_vf_clay          , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_vf_om            ', SITE_soil_vf_om            , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_wf_gravels       ', SITE_soil_wf_gravels       , 'soil')
       CALL ncio_write_serial (fsrfdata, 'soil_wf_sand          ', SITE_soil_wf_sand          , 'soil')
@@ -811,6 +824,7 @@ ENDIF
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_quartz_mineral', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_gravels       ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_sand          ', 'source', source)
+      CALL ncio_put_attr     (fsrfdata, 'soil_vf_clay          ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_vf_om            ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_wf_gravels       ', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_wf_sand          ', 'source', source)
@@ -842,8 +856,10 @@ ENDIF
       CALL ncio_put_attr     (fsrfdata, 'soil_BA_alpha', 'source', source)
       CALL ncio_put_attr     (fsrfdata, 'soil_BA_beta ', 'source', source)
 
-      CALL ncio_write_serial (fsrfdata, 'soil_texture ', SITE_soil_texture, 'soil')
-      CALL ncio_put_attr     (fsrfdata, 'soil_texture ', 'source', source)
+      IF (DEF_Runoff_SCHEME == 3) THEN ! for Simple VIC
+         CALL ncio_write_serial (fsrfdata, 'soil_texture ', SITE_soil_texture)
+         CALL ncio_put_attr     (fsrfdata, 'soil_texture ', 'source', source)
+      ENDIF
 
       IF(DEF_USE_BEDROCK)THEN
          CALL ncio_write_serial (fsrfdata, 'depth_to_bedrock', SITE_dbedrock)
@@ -924,6 +940,7 @@ ENDIF
       IF (allocated(SITE_soil_vf_quartz_mineral)) deallocate(SITE_soil_vf_quartz_mineral)
       IF (allocated(SITE_soil_vf_gravels       )) deallocate(SITE_soil_vf_gravels       )
       IF (allocated(SITE_soil_vf_sand          )) deallocate(SITE_soil_vf_sand          )
+      IF (allocated(SITE_soil_vf_clay          )) deallocate(SITE_soil_vf_clay          )
       IF (allocated(SITE_soil_vf_om            )) deallocate(SITE_soil_vf_om            )
       IF (allocated(SITE_soil_wf_gravels       )) deallocate(SITE_soil_wf_gravels       )
       IF (allocated(SITE_soil_wf_sand          )) deallocate(SITE_soil_wf_sand          )
@@ -946,8 +963,6 @@ ENDIF
 #endif
       IF (allocated(SITE_soil_BA_alpha         )) deallocate(SITE_soil_BA_alpha         )
       IF (allocated(SITE_soil_BA_beta          )) deallocate(SITE_soil_BA_beta          )
-      
-      IF (allocated(SITE_soil_texture          )) deallocate(SITE_soil_texture          )
 
       IF (allocated(SITE_sf_lut                )) deallocate(SITE_sf_lut                )
       IF (allocated(SITE_slp_type              )) deallocate(SITE_slp_type              )

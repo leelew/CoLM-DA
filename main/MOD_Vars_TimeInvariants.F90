@@ -197,6 +197,7 @@ MODULE MOD_Vars_TimeInvariants
    real(r8), allocatable :: vf_gravels   (:,:)  !volumetric fraction of gravels
    real(r8), allocatable :: vf_om        (:,:)  !volumetric fraction of organic matter
    real(r8), allocatable :: vf_sand      (:,:)  !volumetric fraction of sand
+   real(r8), allocatable :: vf_clay      (:,:)  !volumetric fraction of clay
    real(r8), allocatable :: wf_gravels   (:,:)  !gravimetric fraction of gravels
    real(r8), allocatable :: wf_sand      (:,:)  !gravimetric fraction of sand
    real(r8), allocatable :: OM_density   (:,:)  !OM density (kg/m3)
@@ -207,7 +208,7 @@ MODULE MOD_Vars_TimeInvariants
    real(r8), allocatable :: psi0         (:,:)  !minimum soil suction [mm] (NOTE: "-" valued)
    real(r8), allocatable :: bsw          (:,:)  !clapp and hornbereger "b" parameter [-]
    real(r8), allocatable :: theta_r      (:,:)  !residual moisture content [-]
-   real(r8), allocatable :: BVIC         (:,:)  !b parameter in Fraction of saturated soil in a grid calculated by VIC
+   real(r8), allocatable :: BVIC         (:)  !b parameter in Fraction of saturated soil in a grid calculated by VIC
 #ifdef vanGenuchten_Mualem_SOIL_MODEL
    real(r8), allocatable :: alpha_vgm    (:,:)  !a parameter corresponding approximately to the inverse of the air-entry value
    real(r8), allocatable :: L_vgm        (:,:)  !pore-connectivity parameter [dimensionless]
@@ -320,6 +321,7 @@ CONTAINS
             allocate (vf_gravels   (nl_soil,numpatch))
             allocate (vf_om        (nl_soil,numpatch))
             allocate (vf_sand      (nl_soil,numpatch))
+            allocate (vf_clay      (nl_soil,numpatch))
             allocate (wf_gravels   (nl_soil,numpatch))
             allocate (wf_sand      (nl_soil,numpatch))
             allocate (OM_density   (nl_soil,numpatch))
@@ -329,7 +331,7 @@ CONTAINS
             allocate (psi0         (nl_soil,numpatch))
             allocate (bsw          (nl_soil,numpatch))
             allocate (theta_r      (nl_soil,numpatch))
-            allocate (BVIC         (nl_soil,numpatch))
+            allocate (BVIC         (numpatch))
 
 #ifdef vanGenuchten_Mualem_SOIL_MODEL
             allocate (alpha_vgm    (nl_soil,numpatch))
@@ -442,6 +444,7 @@ CONTAINS
       CALL ncio_read_vector (file_restart, 'vf_gravels',   nl_soil, landpatch, vf_gravels) ! volumetric fraction of gravels
       CALL ncio_read_vector (file_restart, 'vf_om     ',   nl_soil, landpatch, vf_om     ) ! volumetric fraction of organic matter
       CALL ncio_read_vector (file_restart, 'vf_sand   ',   nl_soil, landpatch, vf_sand   ) ! volumetric fraction of sand
+      CALL ncio_read_vector (file_restart, 'vf_clay   ',   nl_soil, landpatch, vf_clay  ,defval = 0.1 ) ! volumetric fraction of clay
       CALL ncio_read_vector (file_restart, 'wf_gravels',   nl_soil, landpatch, wf_gravels) ! gravimetric fraction of gravels
       CALL ncio_read_vector (file_restart, 'wf_sand   ',   nl_soil, landpatch, wf_sand   ) ! gravimetric fraction of sand
       CALL ncio_read_vector (file_restart, 'OM_density',   nl_soil, landpatch, OM_density) ! OM density
@@ -451,7 +454,7 @@ CONTAINS
       CALL ncio_read_vector (file_restart, 'psi0   ' ,     nl_soil, landpatch, psi0      ) ! minimum soil suction [mm] (NOTE: "-" valued)
       CALL ncio_read_vector (file_restart, 'bsw    ' ,     nl_soil, landpatch, bsw       ) ! clapp and hornbereger "b" parameter [-]
       CALL ncio_read_vector (file_restart, 'theta_r  ' ,   nl_soil, landpatch, theta_r   ) ! residual moisture content [-]
-      CALL ncio_read_vector (file_restart, 'BVIC  ' ,      nl_soil, landpatch, BVIC   )    ! b parameter in Fraction of saturated soil in a grid calculated by VIC
+      CALL ncio_read_vector (file_restart, 'BVIC  ' ,      landpatch, BVIC   )    ! b parameter in Fraction of saturated soil in a grid calculated by VIC
 #ifdef vanGenuchten_Mualem_SOIL_MODEL
       CALL ncio_read_vector (file_restart, 'alpha_vgm' ,   nl_soil, landpatch, alpha_vgm ) ! a parameter corresponding approximately to the inverse of the air-entry value
       CALL ncio_read_vector (file_restart, 'L_vgm    ' ,   nl_soil, landpatch, L_vgm     ) ! pore-connectivity parameter [dimensionless]
@@ -623,6 +626,7 @@ CONTAINS
       CALL ncio_write_vector (file_restart, 'vf_gravels', 'soil', nl_soil, 'patch', landpatch, vf_gravels, compress) ! volumetric fraction of gravels
       CALL ncio_write_vector (file_restart, 'vf_om     ', 'soil', nl_soil, 'patch', landpatch, vf_om     , compress) ! volumetric fraction of organic matter
       CALL ncio_write_vector (file_restart, 'vf_sand   ', 'soil', nl_soil, 'patch', landpatch, vf_sand   , compress) ! volumetric fraction of sand
+      CALL ncio_write_vector (file_restart, 'vf_clay   ', 'soil', nl_soil, 'patch', landpatch, vf_clay   , compress) ! volumetric fraction of clay
       CALL ncio_write_vector (file_restart, 'wf_gravels', 'soil', nl_soil, 'patch', landpatch, wf_gravels, compress) ! gravimetric fraction of gravels
       CALL ncio_write_vector (file_restart, 'wf_sand   ', 'soil', nl_soil, 'patch', landpatch, wf_sand   , compress) ! gravimetric fraction of sand
       CALL ncio_write_vector (file_restart, 'OM_density', 'soil', nl_soil, 'patch', landpatch, OM_density, compress) ! OM_density
@@ -632,7 +636,7 @@ CONTAINS
       CALL ncio_write_vector (file_restart, 'psi0      ', 'soil', nl_soil, 'patch', landpatch, psi0      , compress) ! minimum soil suction [mm] (NOTE: "-" valued)
       CALL ncio_write_vector (file_restart, 'bsw       ', 'soil', nl_soil, 'patch', landpatch, bsw       , compress) ! clapp and hornbereger "b" parameter [-]
       CALL ncio_write_vector (file_restart, 'theta_r  ' , 'soil', nl_soil, 'patch', landpatch, theta_r   , compress) ! residual moisture content [-]
-      CALL ncio_write_vector (file_restart, 'BVIC    '  , 'soil', nl_soil, 'patch', landpatch, BVIC      , compress) ! b parameter in Fraction of saturated soil in a grid calculated by VIC
+      CALL ncio_write_vector (file_restart, 'BVIC    '  , 'patch', landpatch, BVIC, compress) ! b parameter in Fraction of saturated soil in a grid calculated by VIC
 
 #ifdef vanGenuchten_Mualem_SOIL_MODEL
       CALL ncio_write_vector (file_restart, 'alpha_vgm' , 'soil', nl_soil, 'patch', landpatch, alpha_vgm , compress) ! a parameter corresponding approximately to the inverse of the air-entry value
@@ -772,6 +776,7 @@ CONTAINS
             deallocate (vf_gravels     )
             deallocate (vf_om          )
             deallocate (vf_sand        )
+            deallocate (vf_clay        )
             deallocate (wf_gravels     )
             deallocate (wf_sand        )
             deallocate (OM_density     )
@@ -876,6 +881,7 @@ CONTAINS
       CALL check_vector_data ('vf_gravels   [m3/m3] ', vf_gravels  ) ! volumetric fraction of gravels
       CALL check_vector_data ('vf_om        [m3/m3] ', vf_om       ) ! volumetric fraction of organic matter
       CALL check_vector_data ('vf_sand      [m3/m3] ', vf_sand     ) ! volumetric fraction of sand
+      CALL check_vector_data ('vf_clay      [m3/m3] ', vf_clay     ) ! volumetric fraction of clay
       CALL check_vector_data ('wf_gravels   [kg/kg] ', wf_gravels  ) ! gravimetric fraction of gravels
       CALL check_vector_data ('wf_sand      [kg/kg] ', wf_sand     ) ! gravimetric fraction of sand
       CALL check_vector_data ('OM_density   [kg/m3] ', OM_density  ) ! OM density

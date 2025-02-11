@@ -47,9 +47,16 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
   integer  :: steps_in_one_deltim
   integer  :: i, m, u, k, j
 
-  real(r8) :: forc_rain_ens(num_ens), forc_snow_ens(num_ens), forc_sols_ens(num_ens), &
-              forc_soll_ens(num_ens), forc_solsd_ens(num_ens), forc_solld_ens(num_ens), &
-              forc_frl_ens(num_ens)
+  real(r8) :: &
+    forc_t_ens(num_ens), &
+    forc_rain_ens(num_ens), &
+    forc_snow_ens(num_ens), &
+    forc_prc_ens(num_ens), &
+    forc_prl_ens(num_ens), &
+    forc_sols_ens(num_ens), &
+    forc_soll_ens(num_ens), &
+    forc_solsd_ens(num_ens), &
+    forc_solld_ens(num_ens)
 
 #ifdef OPENMP
 !$OMP PARALLEL DO NUM_THREADS(OPENMP) &
@@ -63,8 +70,12 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
           ! generate ensemble samples by forcing
           CALL disturb_forc_ens( &
             num_ens, &
-            forc_rain(i), forc_snow(i), forc_sols(i), forc_soll(i), forc_solsd(i), forc_solld(i), forc_frl(i), &
-            forc_rain_ens, forc_snow_ens, forc_sols_ens, forc_soll_ens, forc_solsd_ens, forc_solld_ens, forc_frl_ens)
+            forc_t(i), &
+            forc_rain(i), forc_snow(i), forc_prc(i), forc_prl(i), &
+            forc_sols(i), forc_soll(i), forc_solsd(i), forc_solld(i), &
+            forc_t_ens, &
+            forc_rain_ens, forc_snow_ens, forc_prc_ens, forc_prl_ens, &
+            forc_sols_ens, forc_soll_ens, forc_solsd_ens, forc_solld_ens)
 
           ! Apply forcing mask
           IF (DEF_forcing%has_missing_value) THEN
@@ -104,7 +115,7 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
                 hksati(1:,i),    csol(1:,i),      k_solids(1:,i),  dksatu(1:,i),    &
                 dksatf(1:,i),    dkdry(1:,i),     BA_alpha(1:,i),  BA_beta(1:,i),   &
                 rootfr(1:,m),    lakedepth(i),    dz_lake(1:,i),   topostd(i),      &
-                BVIC(1,i),                                                          &
+                BVIC(i),                                                          &
 #if(defined CaMa_Flood)
               ! flood variables [mm, m2/m2, mm/s, mm/s]
                 flddepth_cama(i),fldfrc_cama(i),fevpg_fld(i),  finfg_fld(i),        &
@@ -123,10 +134,10 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
 
               ! ATMOSPHERIC FORCING
                 forc_pco2m(i),   forc_po2m(i),    forc_us(i),       forc_vs(i),       &
-                forc_t(i),       forc_q(i),       forc_prc(i),      forc_prl(i),      &
+                forc_t_ens(j),   forc_q(i),       forc_prc_ens(j),  forc_prl_ens(j),  &
                 forc_rain_ens(j),forc_snow_ens(j),forc_psrf(i),     forc_pbot(i),     &
                 forc_sols_ens(j),forc_soll_ens(j),forc_solsd_ens(j),forc_solld_ens(j),&
-                forc_frl_ens(j), forc_hgt_u(i),   forc_hgt_t(i),    forc_hgt_q(i),    &
+                forc_frl(i),     forc_hgt_u(i),   forc_hgt_t(i),    forc_hgt_q(i),    &
                 forc_rhoair(i),                                                     &
               ! CBL height forcing
                 forc_hpbl(i),                                                       &

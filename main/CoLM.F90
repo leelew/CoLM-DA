@@ -92,7 +92,6 @@ PROGRAM CoLM
 #ifdef DataAssimilation
    USE MOD_DA_Main
    USE MOD_DA_Vars_TimeVariables
-   USE MOD_DA_Driver
 #endif
 
 #ifdef USEMPI
@@ -109,7 +108,7 @@ PROGRAM CoLM
    character(len=256) :: dir_restart
    character(len=256) :: fsrfdata
 
-   real(r8) :: deltim       ! time step (senconds)
+   real(r8) :: deltim       ! time step (seconds)
    integer  :: sdate(3)     ! calendar (year, julian day, seconds)
    integer  :: idate(3)     ! calendar (year, julian day, seconds)
    integer  :: edate(3)     ! calendar (year, julian day, seconds)
@@ -275,19 +274,21 @@ PROGRAM CoLM
       CALL allocate_TimeInvariants ()
       CALL READ_TimeInvariants (lc_year, casename, dir_restart)
 
-#ifdef DataAssimilation
-      ! Read in the model time varying data (model state variables) for ensemble
-      CALL allocatable_TimeVariables_ens()
-      CALL READ_TimeVariables_ens(jdate, lc_year, casename, dir_restart)
-#else
       ! Read in the model time varying data (model state variables)
       CALL allocate_TimeVariables  ()
       CALL READ_TimeVariables (jdate, lc_year, casename, dir_restart)
+
+#ifdef DataAssimilation
+      ! Read in the model time varying data (model state variables) for ensemble
+      CALL allocate_TimeVariables_ens()
+      CALL READ_TimeVariables_ens(jdate, lc_year, casename, dir_restart)   
 #endif
 
       ! Read in SNICAR optical and aging parameters
-      CALL SnowOptics_init( DEF_file_snowoptics ) ! SNICAR optical parameters
-      CALL SnowAge_init( DEF_file_snowaging )     ! SNICAR aging   parameters
+      IF (DEF_USE_SNICAR) THEN
+         CALL SnowOptics_init( DEF_file_snowoptics ) ! SNICAR optical parameters
+         CALL SnowAge_init( DEF_file_snowaging )     ! SNICAR aging   parameters
+      ENDIF
 
       ! ----------------------------------------------------------------------
       doalb = .true.
@@ -449,13 +450,13 @@ PROGRAM CoLM
 #endif
 
 #ifdef DataAssimilation
-         CALL do_DataAssimilation ()
+         CALL do_DataAssimilation (idate, deltim)
 #endif
 
          ! Write out the model variables for restart run and the histroy file
          ! ----------------------------------------------------------------------
          CALL hist_out (idate, deltim, itstamp, etstamp, ptstamp, dir_hist, casename)
-         
+
          CALL CheckEquilibrium (idate, deltim, itstamp, dir_hist, casename)
 
          ! DO land USE and land cover change simulation
@@ -547,7 +548,9 @@ PROGRAM CoLM
 #endif
 
 #ifdef CoLMDEBUG
-         CALL print_VSF_iteration_stat_info ()
+         IF (DEF_USE_VariablySaturatedFlow) THEN
+            CALL print_VSF_iteration_stat_info ()
+         ENDIF
 #endif
 
 
@@ -578,6 +581,9 @@ PROGRAM CoLM
 
       CALL deallocate_TimeInvariants ()
       CALL deallocate_TimeVariables  ()
+#ifdef DataAssimilation
+      CALL deallocate_TimeVariables_ens()
+#endif
       CALL deallocate_1D_Forcing     ()
       CALL deallocate_1D_Fluxes      ()
 

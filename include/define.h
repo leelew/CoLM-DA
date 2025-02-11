@@ -69,7 +69,7 @@
 #undef LULCC
 
 ! 9. If defined, data assimilation is used.
-#undef DataAssimilation
+#define DataAssimilation
 
 ! 10. Vector write model.
 !     1) "VectorInOneFileP" : write vector data in one file in parallel mode;

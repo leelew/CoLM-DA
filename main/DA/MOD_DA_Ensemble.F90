@@ -10,7 +10,13 @@ MODULE MOD_DA_Ensemble
 
     PRIVATE
 
-    real(r8) :: std_precip = 0.5, std_solar = 0.3, std_frl = 0.3
+    ! disturbance standard deviation
+    ! SMOS brightness temperature assimilation into the Community Land Model
+    !     Hydrol. Earth Syst. Sci., 21, 5929–5951, 2017, 
+    !     https://doi.org/10.5194/hess-21-5929-2017
+    real(r8) :: std_sr = 0.3 ! multiplicative noise
+    real(r8) :: std_ta = 2.5 ! additive noise
+    real(r8) :: std_p  = 0.3 ! multiplicative noise, log-normal noise
 
 !-----------------------------------------------------------------------
 
@@ -60,13 +66,17 @@ CONTAINS
         ENDDO
 
         ! generate ensemble samples according different types (0: additive, 1: multiplicative)
-        IF (type == 0) THEN
+        IF (type == 0) THEN ! additive normal
             DO i = 1, num_ens
                 A_ens(i) = A + z(i)
             ENDDO
-        ELSEIF (type == 1) THEN
+        ELSEIF (type == 1) THEN ! multiplicative normal
             DO i = 1, num_ens
                 A_ens(i) = A * (1.0 + z(i))
+            ENDDO
+        ELSEIF (type == 2) THEN ! multiplicative log-normal
+            DO i = 1, num_ens
+                A_ens(i) = A * (1.0 + exp(z(i)))
             ENDDO
         ENDIF
 
@@ -79,8 +89,8 @@ CONTAINS
 
     SUBROUTINE disturb_forc_ens(&
         num_ens, &
-        forc_rain, forc_snow, forc_sols, forc_soll,  forc_solsd, forc_solld, forc_frl, &
-        forc_rain_ens, forc_snow_ens, forc_sols_ens, forc_soll_ens, forc_solsd_ens, forc_solld_ens, forc_frl_ens)
+        forc_t, forc_rain, forc_snow, forc_prc, forc_prl, forc_sols, forc_soll,  forc_solsd, forc_solld, &
+        forc_t_ens, forc_rain_ens, forc_snow_ens, forc_prc_ens, forc_prl_ens, forc_sols_ens, forc_soll_ens, forc_solsd_ens, forc_solld_ens)
 
 !-----------------------------------------------------------------------
     IMPLICIT NONE
@@ -88,32 +98,37 @@ CONTAINS
 !------------------------ Dummy Argument ------------------------------
     integer,  intent(in) :: num_ens
     real(r8), intent(in) :: &
+        forc_t,     &
         forc_rain,  &
         forc_snow,  &
+        forc_prc,   &
+        forc_prl,   &
         forc_sols,  &
         forc_soll,  &
         forc_solsd, &
-        forc_solld, &
-        forc_frl
+        forc_solld 
 
     real(r8), intent(out) :: &
+        forc_t_ens (num_ens),     &
         forc_rain_ens (num_ens),  &
         forc_snow_ens (num_ens),  &
+        forc_prc_ens (num_ens),   &
+        forc_prl_ens (num_ens),   &
         forc_sols_ens (num_ens),  &
         forc_soll_ens (num_ens),  &
         forc_solsd_ens(num_ens),  &
-        forc_solld_ens(num_ens),  &
-        forc_frl_ens  (num_ens)
+        forc_solld_ens(num_ens)
 
 !------------------------ Local Variables ------------------------------
-    
-        CALL disturb_ens(num_ens, 0, forc_rain,  0.0, std_precip, forc_rain_ens)
-        CALL disturb_ens(num_ens, 0, forc_snow,  0.0, std_precip, forc_snow_ens)
-        CALL disturb_ens(num_ens, 0, forc_sols,  0.0, std_solar,  forc_sols_ens)
-        CALL disturb_ens(num_ens, 0, forc_soll,  0.0, std_solar,  forc_soll_ens)
-        CALL disturb_ens(num_ens, 0, forc_solsd, 0.0, std_solar,  forc_solsd_ens)
-        CALL disturb_ens(num_ens, 0, forc_solld, 0.0, std_solar,  forc_solld_ens)
-        CALL disturb_ens(num_ens, 0, forc_frl,   0.0, std_frl,    forc_frl_ens)
+        CALL disturb_ens(num_ens, 0, forc_t,     0.0, std_ta,  forc_t_ens)
+        CALL disturb_ens(num_ens, 2, forc_rain,  0.0, std_p,   forc_rain_ens)
+        CALL disturb_ens(num_ens, 2, forc_snow,  0.0, std_p,   forc_snow_ens)
+        CALL disturb_ens(num_ens, 2, forc_prc,   0.0, std_p,   forc_prc_ens)
+        CALL disturb_ens(num_ens, 2, forc_prl,   0.0, std_p,   forc_prl_ens)
+        CALL disturb_ens(num_ens, 1, forc_sols,  0.0, std_sr,  forc_sols_ens)
+        CALL disturb_ens(num_ens, 1, forc_soll,  0.0, std_sr,  forc_soll_ens)
+        CALL disturb_ens(num_ens, 1, forc_solsd, 0.0, std_sr,  forc_solsd_ens)
+        CALL disturb_ens(num_ens, 1, forc_solld, 0.0, std_sr,  forc_solld_ens)
         
     END SUBROUTINE disturb_forc_ens
 

@@ -92,7 +92,9 @@ CONTAINS
 
             allocate (forc_hpbl   (numpatch) ) ! atmospheric boundary layer height [m]
 
-            allocate (forc_topo (numpatch))
+            IF (DEF_USE_Forcing_Downscaling) THEN
+               allocate (forc_topo (numpatch))
+            ENDIF
 
             IF (DEF_Aerosol_Readin) THEN
                allocate (forc_aerdep(14,numpatch) ) ! atmospheric aerosol deposition data [kg/m/s]
@@ -141,7 +143,10 @@ CONTAINS
             deallocate ( forc_ozone  ) ! Ozone partial pressure [mol/mol]
 
             deallocate ( forc_hpbl   ) ! atmospheric boundary layer height [m]
-            deallocate (forc_topo)
+
+            IF (DEF_USE_Forcing_Downscaling) THEN
+               deallocate (forc_topo)
+            ENDIF
 
             IF (DEF_Aerosol_Readin) THEN
                deallocate ( forc_aerdep ) ! atmospheric aerosol deposition data [kg/m/s]

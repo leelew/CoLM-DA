@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DataAssimilation
+MODULE MOD_DA_Main
 
    USE MOD_Precision
    !USE MOD_DA_GRACE
@@ -23,10 +23,11 @@ CONTAINS
    END SUBROUTINE init_DataAssimilation
 
    ! ----------
-   SUBROUTINE do_DataAssimilation ()
+   SUBROUTINE do_DataAssimilation (idate, deltim)
       
    IMPLICIT NONE
-      
+   integer,  intent(in) :: idate(3)
+   real(r8), intent(in) :: deltim   
 
       !CALL do_DA_GRACE (idate, deltim)
       CALL run_DA_SMAP  ()
@@ -44,5 +45,5 @@ CONTAINS
 
    END SUBROUTINE final_DataAssimilation
 
-END MODULE MOD_DataAssimilation
+END MODULE MOD_DA_Main
 #endif

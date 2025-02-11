@@ -495,39 +495,39 @@ CONTAINS
 
 
 !-----------------------------------------------------------------------
-   FUNCTION save_to_restart (idate, deltim, itstamp, ptstamp) result(rwrite)
+!    FUNCTION save_to_restart (idate, deltim, itstamp, ptstamp) result(rwrite)
 
-   USE MOD_Namelist
-   IMPLICIT NONE
+!    USE MOD_Namelist
+!    IMPLICIT NONE
 
-   logical :: rwrite
+!    logical :: rwrite
 
-   integer,  intent(in) :: idate(3)
-   real(r8), intent(in) :: deltim
-   type(timestamp), intent(in) :: itstamp, ptstamp
+!    integer,  intent(in) :: idate(3)
+!    real(r8), intent(in) :: deltim
+!    type(timestamp), intent(in) :: itstamp, ptstamp
 
 
-      ! added by yuan, 08/31/2014
-      SELECTCASE (trim(adjustl(DEF_WRST_FREQ)))
-      CASE ('TIMESTEP')
-         rwrite = .true.
-      CASE ('HOURLY')
-         rwrite = isendofhour (idate, deltim)
-      CASE ('DAILY')
-         rwrite = isendofday(idate, deltim)
-      CASE ('MONTHLY')
-         rwrite = isendofmonth(idate, deltim)
-      CASE ('YEARLY')
-         rwrite = isendofyear(idate, deltim)
-      CASE default
-         write(*,*) 'Warning: Please USE one of TIMESTEP/HOURLY/DAILY/MONTHLY/YEARLY for restart frequency.'
-      ENDSELECT
+!       ! added by yuan, 08/31/2014
+!       SELECTCASE (trim(adjustl(DEF_WRST_FREQ)))
+!       CASE ('TIMESTEP')
+!          rwrite = .true.
+!       CASE ('HOURLY')
+!          rwrite = isendofhour (idate, deltim)
+!       CASE ('DAILY')
+!          rwrite = isendofday(idate, deltim)
+!       CASE ('MONTHLY')
+!          rwrite = isendofmonth(idate, deltim)
+!       CASE ('YEARLY')
+!          rwrite = isendofyear(idate, deltim)
+!       CASE default
+!          write(*,*) 'Warning: Please USE one of TIMESTEP/HOURLY/DAILY/MONTHLY/YEARLY for restart frequency.'
+!       ENDSELECT
 
-      IF (rwrite) THEN
-         rwrite = ((ptstamp <= itstamp) .or. isendofyear(idate,deltim))
-      ENDIF
+!       IF (rwrite) THEN
+!          rwrite = ((ptstamp <= itstamp) .or. isendofyear(idate,deltim))
+!       ENDIF
 
-   END FUNCTION save_to_restart
+!    END FUNCTION save_to_restart
 
 
 
@@ -890,7 +890,7 @@ ENDIF
 #endif
 
 #ifdef RangeCheck
-      CALL check_TimeVariables
+      CALL check_TimeVariables_ens
 #endif
 
       IF (p_is_master) THEN

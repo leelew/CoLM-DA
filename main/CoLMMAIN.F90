@@ -102,7 +102,7 @@ SUBROUTINE CoLMMAIN ( &
          ! additional variables required by coupling with WRF model
            emis,         z0m,          zol,          rib,          &
            ustar,        qstar,        tstar,        fm,           &
-           fh,           fq,           lb,           dz_soisno     )
+           fh,           fq                                        )
 
 !=======================================================================
 !
@@ -474,8 +474,6 @@ SUBROUTINE CoLMMAIN ( &
         fm          ,&! integral of profile function for momentum
         fh          ,&! integral of profile function for heat
         fq            ! integral of profile function for moisture
-   integer, intent(out) :: lb            ! lower bound of arrays
-   real(r8),intent(out) :: dz_soisno(maxsnl+1:nl_soil)  ! layer thickness (m)
 
 ! ----------------------- Local  Variables -----------------------------
    logical  :: is_dry_lake
@@ -512,7 +510,7 @@ SUBROUTINE CoLMMAIN ( &
         totwb       ,&! water mass at the begining of time step
         wt          ,&! fraction of vegetation buried (covered) by snow [-]
         z_soisno (maxsnl+1:nl_soil), &! layer depth (m)
-        !dz_soisno(maxsnl+1:nl_soil), &! layer thickness (m)
+        dz_soisno(maxsnl+1:nl_soil), &! layer thickness (m)
         zi_soisno(maxsnl  :nl_soil)   ! interface level below a "z" level (m)
 
    real(r8) :: &
@@ -525,13 +523,11 @@ SUBROUTINE CoLMMAIN ( &
         pg_rain     ,&! rainfall onto ground including canopy runoff [kg/(m2 s)]
         pg_snow     ,&! snowfall onto ground including canopy runoff [kg/(m2 s)]
         qintr_rain  ,&! rainfall interception (mm h2o/s)
-        qintr_snow  ,&! snowfall interception (mm h2o/s)
-        errw_rsub     ! the possible subsurface runoff deficit after PHS is included
+        qintr_snow    ! snowfall interception (mm h2o/s)
 
    integer snl      ,&! number of snow layers
         imelt(maxsnl+1:nl_soil), &! flag for: melting=1, freezing=2, Nothing happended=0
-        !lb ,
-        lbsn    ,&! lower bound of arrays
+        lb ,lbsn    ,&! lower bound of arrays
         j             ! do looping index
 
    ! For SNICAR snow model
@@ -648,8 +644,6 @@ SUBROUTINE CoLMMAIN ( &
                totwb = totwb + wetwat
             ENDIF
          ENDIF
-
-         errw_rsub = 0._r8
 
          fiold(:) = 0.0
          IF (snl <0 ) THEN
@@ -772,7 +766,7 @@ SUBROUTINE CoLMMAIN ( &
                  qsubl_snow        ,qfros_snow        ,fsno              ,rsur              ,&
                  rnof              ,qinfl             ,pondmx            ,&
                  ssi               ,wimp              ,smpmin            ,zwt               ,&
-                 wa                ,qcharge           ,errw_rsub         ,&
+                 wa                ,qcharge           ,&
 
 #if(defined CaMa_Flood)
              !add variables for flood depth [mm], flood fraction [0-1] and re-infiltration [mm/s] calculation.
@@ -909,10 +903,10 @@ SUBROUTINE CoLMMAIN ( &
 #endif
 
 #ifndef CatchLateralFlow
-         errorw=(endwb-totwb)-(forc_prc+forc_prl-fevpa-rnof-errw_rsub)*deltim
+         errorw=(endwb-totwb)-(forc_prc+forc_prl-fevpa-rnof)*deltim
 #else
       ! for lateral flow, "rsur" is considered in HYDRO/MOD_Hydro_SurfaceFlow.F90
-         errorw=(endwb-totwb)-(forc_prc+forc_prl-fevpa-errw_rsub)*deltim
+         errorw=(endwb-totwb)-(forc_prc+forc_prl-fevpa)*deltim
 #endif
 
 #ifdef CROP
@@ -937,9 +931,6 @@ SUBROUTINE CoLMMAIN ( &
                write(6,*) 'Warning: water balance violation in CoLMMAIN (dry lake) ', errorw
             ENDIF
             CALL CoLM_stop ()
-         ENDIF
-         IF(abs(errw_rsub*deltim)>1.e-3) THEN
-            write(6,*) 'Subsurface runoff deficit due to PHS', errw_rsub*deltim
          ENDIF
 #endif
 

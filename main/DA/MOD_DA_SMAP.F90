@@ -44,7 +44,7 @@ MODULE MOD_DA_SMAP
     integer :: idate_begin, idate_end                         ! begin and end seconds of current step
     
     ! obs
-    logical :: has_obs
+    logical :: has_obs, has_file
     integer :: num_obs
     integer :: num_loc_obs
     real(r8), allocatable :: smap_lat  (:)                    ! latitude 
@@ -121,26 +121,31 @@ CONTAINS
         hour = int(idate(3)/3600)
 
         ! define file path of SMAP of each day
-        write(yearstr,  '(I4.4)') idate(1)
-        write(monthstr, '(I2.2)') month
-        write(daystr,   '(I2.2)') mday
-        write(hourstr,  '(I2.2)') hour
+        write (yearstr,  '(I4.4)') idate(1)
+        write (monthstr, '(I2.2)') month
+        write (daystr,   '(I2.2)') mday
+        write (hourstr,  '(I2.2)') hour
         file_smap = trim(DEF_DA_obsdir) // '/SMAP_L1C_TB_D_' // &
             trim(yearstr) // '_' // trim(monthstr) // '_' // trim(daystr) // '_' // trim(hourstr) // '.nc'
+        inquire (file=trim(file_smap), exist=has_file)
 
         ! whether have any obs in this time interval
-        CALL ncio_read_bcast_serial (file_smap, 'time', smap_time)
-        allocate ( dt_begin(size(smap_time)) )
-        allocate ( dt_end  (size(smap_time)) )
-        idate_begin = idate(3)
-        idate_end = idate(3) + deltim
-        dt_begin = smap_time - idate_begin
-        dt_end = smap_time - idate_end 
         has_obs = .false.
-        IF (any(dt_begin >= 0 .and. dt_end <= 0)) THEN
-            has_obs = .true.
+        IF (has_file) THEN
+            CALL ncio_read_bcast_serial (file_smap, 'time', smap_time)
+            allocate ( dt_begin(size(smap_time)) )
+            allocate ( dt_end  (size(smap_time)) )
+            idate_begin = idate(3)
+            idate_end = idate(3) + deltim
+            dt_begin = smap_time - idate_begin
+            dt_end = smap_time - idate_end 
+            IF (any(dt_begin >= 0 .and. dt_end <= 0)) THEN
+                has_obs = .true.
+            ENDIF
+            num_obs = size(smap_time)  ! all obs contains in current file (not constrain obs time)
+        ELSE
+            has_obs = .false.
         ENDIF
-        num_obs = size(smap_time)  ! all obs contains in current file (not constrain obs time)
 
         ! allocate memory if have observations
         IF (has_obs) THEN
@@ -205,7 +210,6 @@ CONTAINS
             CALL ncio_read_bcast_serial (file_smap, 'tb_v', smap_tb_v)
 
             ! forward model
-            ! (TODO): input vf_clay
             IF (p_is_worker) THEN
                 DO iens = 1, num_ens
                     DO np = 1, numpatch
@@ -215,7 +219,7 @@ CONTAINS
                             tref_ens(iens,np), t_soisno_ens(:,iens,np), tleaf_ens(iens,np), &
                             wliq_soisno_ens(:,iens,np), wice_soisno_ens(:,iens,np), h2osoi_ens(:,iens,np), &
                             snowdp_ens(iens,np), lai_ens(iens,np), sai_ens(iens,np), &
-                            vf_sand(:,np), vf_sand(:,np), BD_all(:,np), porsl(:,np), &  
+                            vf_clay(:,np), vf_sand(:,np), BD_all(:,np), porsl(:,np), &  
                             pred_tb_pset_ens_h(iens,np), pred_tb_pset_ens_v(iens,np))
                     ENDDO
                 ENDDO
