@@ -831,8 +831,9 @@ IF((patchtype<=1) .or. is_dry_lake)THEN   ! soil ground only
          ENDIF
 
 #ifdef DataAssimilation
-         rsur = max(min(rsur * fslp_k(ipatch), gwat), 0.)
-         rsubst = rsubst * fslp_k(ipatch)
+         !//TODO: Lu Li
+         !rsur = max(min(rsur * fslp_k(ipatch), gwat), 0.)
+         !rsubst = rsubst * fslp_k(ipatch)
 #endif
       ENDIF
 

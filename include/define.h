@@ -31,7 +31,7 @@
 #undef SrfdataDiag
 
 ! 4. If defined, MPI parallelization is enabled.
-#define USEMPI
+#undef USEMPI
 !    Conflict: not used when defined SingPoint.
 #if (defined SinglePoint)
 #undef USEMPI

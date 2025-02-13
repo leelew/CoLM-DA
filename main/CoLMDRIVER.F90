@@ -180,7 +180,8 @@ SUBROUTINE CoLMDRIVER (idate,deltim,dolai,doalb,dosst,oro)
              ! additional variables required by coupling with WRF model
                emis(i),         z0m(i),          zol(i),          rib(i),          &
                ustar(i),        qstar(i),        tstar(i),                         &
-               fm(i),           fh(i),           fq(i)                             )
+               fm(i),           fh(i),           fq(i)                             ) !//TODO: Lu Li: add lb, dz_soisno for data assimilation
+              
 
             ENDDO
          ENDIF

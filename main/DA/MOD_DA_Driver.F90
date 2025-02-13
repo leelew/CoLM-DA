@@ -190,6 +190,7 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
                 srviln(i),       srndln(i),       srniln(i),       qcharge(i),      &
                 xerr(i),         zerr(i),                                           &
 
+                lb_ens(j,i),           dz_soisno_ens(maxsnl+1:,j,i), &
               ! TUNABLE modle constants
                 zlnd,            zsno,            csoilc,          dewmx,           &
                 ! 'wtfact' is updated to gridded 'fsatmax' data.
@@ -200,7 +201,7 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
               ! additional variables required by coupling with WRF model
                 emis_ens(j,i),         z0m_ens(j,i),          zol_ens(j,i),          rib_ens(j,i),          &
                 ustar_ens(j,i),        qstar_ens(j,i),        tstar_ens(j,i),                         &
-                fm_ens(j,i),           fh_ens(j,i),           fq_ens(j,i),        lb_ens(j,i)   , dz_soisno_ens(maxsnl+1:,j,i)     )
+                fm_ens(j,i),           fh_ens(j,i),           fq_ens(j,i) )
 
             ENDDO
           ENDIF

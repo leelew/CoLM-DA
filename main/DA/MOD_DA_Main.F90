@@ -11,14 +11,12 @@ MODULE MOD_DA_Main
 CONTAINS
 
    ! ----------
-   SUBROUTINE init_DataAssimilation (idate, deltim)
+   SUBROUTINE init_DataAssimilation ()
       
    IMPLICIT NONE
-   integer,  intent(in) :: idate(3)
-   real(r8), intent(in) :: deltim
       
       !CALL init_DA_GRACE ()
-      CALL allocate_SMAP  (idate, deltim)
+      CALL allocate_SMAP  ()
 
    END SUBROUTINE init_DataAssimilation
 
@@ -30,7 +28,7 @@ CONTAINS
    real(r8), intent(in) :: deltim   
 
       !CALL do_DA_GRACE (idate, deltim)
-      CALL run_DA_SMAP  ()
+      CALL run_DA_SMAP  (idate, deltim)
       
 
    END SUBROUTINE do_DataAssimilation

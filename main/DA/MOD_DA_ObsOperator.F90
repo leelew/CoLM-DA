@@ -100,7 +100,7 @@ CONTAINS
         ! soil module
         !--------------------
         CALL soil ( &
-            patchtype, patchclass, lb, dz_soisno, &
+            patchtype, patchclass, lb, dz_soisno(lb:nl_soil), &
             t_soisno(lb:nl_soil), h2osoi, wliq_soisno(lb:nl_soil), &
             vf_sand, vf_clay, BD_all, porsl, &
             r_r, tb_soil)

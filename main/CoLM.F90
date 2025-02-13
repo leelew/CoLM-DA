@@ -345,7 +345,7 @@ PROGRAM CoLM
 #endif
 
 #ifdef DataAssimilation
-      CALL init_DataAssimilation (sdate, deltim)
+      CALL init_DataAssimilation ()
 #endif
 
       ! ======================================================================
@@ -533,6 +533,9 @@ PROGRAM CoLM
             CALL WRITE_TimeVariables (jdate, jdate(1), casename, dir_restart)
 #else
             CALL WRITE_TimeVariables (jdate, lc_year,  casename, dir_restart)
+#ifdef DataAssimilation
+            CALL WRITE_TimeVariables_ens(jdate, lc_year, casename, dir_restart)
+#endif            
 #endif
 #if(defined CaMa_Flood)
             IF (p_is_master) THEN
@@ -540,6 +543,8 @@ PROGRAM CoLM
             ENDIF
 #endif
          ENDIF
+
+
 #ifdef RangeCheck
          CALL check_TimeVariables ()
 #endif

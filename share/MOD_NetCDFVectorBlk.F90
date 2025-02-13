@@ -234,7 +234,7 @@ CONTAINS
 #else
             istt = pixelset%vecgs%vstt(iblk,jblk)
             iend = pixelset%vecgs%vend(iblk,jblk)
-            rdata(istt:iend) = sbuff
+            rdata(:,istt:iend) = sbuff
 #endif
 
             deallocate (sbuff)
@@ -1345,7 +1345,7 @@ CONTAINS
 #else
             istt = pixelset%vecgs%vstt(iblk,jblk)
             iend = pixelset%vecgs%vend(iblk,jblk)
-            rbuff = wdata(:,:,istt:iend)
+            rbuff = wdata(:,istt:iend)
 #endif
 
             CALL get_filename_block (filename, iblk, jblk, fileblock)

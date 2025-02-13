@@ -127,8 +127,8 @@ CONTAINS
             allocate (rnof_this_m     (numpatch))
             allocate (rnofmask        (numpatch))
             
-            allocate (fslp_k_mon (12,numpatch))
-            allocate (fslp_k (numpatch))
+            allocate (fslp_k_mon   (12,numpatch))
+            allocate (fslp_k          (numpatch))
          ENDIF
       ENDIF
       

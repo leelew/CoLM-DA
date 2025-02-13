@@ -4,21 +4,10 @@
 
 ! -----------------------------------------------------------------
 MODULE MOD_DA_Vars_TimeVariables
+   !//TODO: Lu Li: Only support default vars and IGBP
 
    USE MOD_Precision
    USE MOD_TimeManager
-#if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
-   USE MOD_Vars_PFTimeVariables
-#endif
-#ifdef BGC
-   USE MOD_BGC_Vars_TimeVariables
-#endif
-#ifdef CatchLateralFlow
-   USE MOD_Hydro_Vars_TimeVariables
-#endif
-#ifdef URBAN_MODEL
-   USE MOD_Urban_Vars_TimeVariables
-#endif
 
    IMPLICIT NONE
    SAVE
@@ -35,16 +24,10 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: rootr_ens       (:,:,:) ! transpiration contribution fraction from different layers
    real(r8), allocatable :: rootflux_ens    (:,:,:) ! water exchange between soil and root. Positive: soil->root [?]
    
-   ! Plant Hydraulic variables
    real(r8), allocatable :: vegwp_ens       (:,:,:) ! vegetation water potential [mm]
    real(r8), allocatable :: gs0sun_ens        (:,:) ! working copy of sunlit stomata conductance
    real(r8), allocatable :: gs0sha_ens        (:,:) ! working copy of shalit stomata conductance
 
-   ! Ozone stress variables !TODO: Why these four variable are not in driver of CoLM???
-   real(r8), allocatable :: o3coefv_sun_ens   (:,:) ! Ozone stress factor for photosynthesis on sunlit leaf
-   real(r8), allocatable :: o3coefv_sha_ens   (:,:) ! Ozone stress factor for photosynthesis on shaded leaf
-   real(r8), allocatable :: o3coefg_sun_ens   (:,:) ! Ozone stress factor for stomata on sunlit leaf
-   real(r8), allocatable :: o3coefg_sha_ens   (:,:) ! Ozone stress factor for stomata on shaded leaf
    real(r8), allocatable :: lai_old_ens       (:,:) ! lai in last time step
    real(r8), allocatable :: o3uptakesun_ens   (:,:) ! Ozone does, sunlit leaf (mmol O3/m^2)
    real(r8), allocatable :: o3uptakesha_ens   (:,:) ! Ozone does, shaded leaf (mmol O3/m^2)
@@ -53,13 +36,12 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: rstfacsha_out_ens (:,:) ! factor of soil water stress on shaded leaf
    real(r8), allocatable :: gssun_out_ens     (:,:) ! stomata conductance on sunlit leaf
    real(r8), allocatable :: gssha_out_ens     (:,:) ! stomata conductance on shaded leaf
-   real(r8), allocatable :: t_grnd_ens        (:,:) ! ground surface temperature [K]
-
    real(r8), allocatable :: assimsun_out_ens  (:,:) ! diagnostic sunlit leaf assim value for output
    real(r8), allocatable :: assimsha_out_ens  (:,:) ! diagnostic sunlit leaf etr value for output
    real(r8), allocatable :: etrsun_out_ens    (:,:) ! diagnostic shaded leaf assim for output
    real(r8), allocatable :: etrsha_out_ens    (:,:) ! diagnostic shaded leaf etr for output
 
+   real(r8), allocatable :: t_grnd_ens        (:,:) ! ground surface temperature [K]
    real(r8), allocatable :: tleaf_ens         (:,:) ! leaf temperature [K]
    real(r8), allocatable :: ldew_ens          (:,:) ! depth of water on foliage [mm]
    real(r8), allocatable :: ldew_rain_ens     (:,:) ! depth of rain on foliage [mm]
@@ -97,8 +79,7 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: t_lake_ens      (:,:,:) ! lake layer teperature [K]
    real(r8), allocatable :: lake_icefrac_ens(:,:,:) ! lake mass fraction of lake layer that is frozen
    real(r8), allocatable :: savedtke1_ens     (:,:) ! top level eddy conductivity (W/m K)
-
-   real(r8), allocatable :: dz_lake_ens (:,:) ! lake depth [m]
+   real(r8), allocatable :: dz_lake_ens     (:,:,:) ! lake depth [m]
 
    real(r8), allocatable :: snw_rds_ens     (:,:,:) ! effective grain radius (col,lyr) [microns, m-6]
    real(r8), allocatable :: mss_bcpho_ens   (:,:,:) ! mass of hydrophobic BC in snow  (col,lyr) [kg]
@@ -127,30 +108,8 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: fh_ens            (:,:) ! integral of profile FUNCTION for heat
    real(r8), allocatable :: fq_ens            (:,:) ! integral of profile FUNCTION for moisture
 
-   real(r8), allocatable :: irrig_rate_ens          (:,:) ! irrigation rate [mm s-1]  !TODO: do not have 
-   real(r8), allocatable :: deficit_irrig_ens       (:,:) ! irrigation amount [kg/m2]
-   real(r8), allocatable :: sum_irrig_ens           (:,:) ! total irrigation amount [kg/m2]
-   real(r8), allocatable :: sum_irrig_count_ens     (:,:) ! total irrigation counts [-]
-   !integer , allocatable :: n_irrig_steps_left_ens  (:,:) ! left steps for once irrigation [-]
-   real(r8), allocatable :: tairday_ens                       (:,:) ! daily mean temperature [degree C]
-   real(r8), allocatable :: usday_ens                         (:,:) ! daily mean wind component in eastward direction [m/s]
-   real(r8), allocatable :: vsday_ens                         (:,:) ! daily mean wind component in northward direction [m/s]
-   real(r8), allocatable :: pairday_ens                       (:,:) ! daily mean pressure [kPa]
-   real(r8), allocatable :: rnetday_ens                       (:,:) ! daily net radiation flux [MJ/m2/day]
-   real(r8), allocatable :: fgrndday_ens                      (:,:) ! daily ground heat flux [MJ/m2/day]
-   real(r8), allocatable :: potential_evapotranspiration_ens  (:,:) ! daily potential evapotranspiration [mm/day]
-
-   integer, allocatable :: lb_ens (:,:)
-   real(r8), allocatable :: dz_soisno_ens      (:,:,:) ! interface depth [m]
-
-   !integer , allocatable :: irrig_method_corn_ens      (:,:) ! irrigation method for corn (0-3)
-   !integer , allocatable :: irrig_method_swheat_ens    (:,:) ! irrigation method for spring wheat (0-3)
-   !integer , allocatable :: irrig_method_wwheat_ens    (:,:) ! irrigation method for winter wheat (0-3)
-   !integer , allocatable :: irrig_method_soybean_ens   (:,:) ! irrigation method for soybean (0-3)
-   !integer , allocatable :: irrig_method_cotton_ens    (:,:) ! irrigation method for cotton (0-3)
-   !integer , allocatable :: irrig_method_rice1_ens     (:,:) ! irrigation method for rice1 (0-3)
-   !integer , allocatable :: irrig_method_rice2_ens     (:,:) ! irrigation method for rice2 (0-3)
-   !integer , allocatable :: irrig_method_sugarcane_ens (:,:) ! irrigation method for sugarcane (0-3)
+   integer, allocatable  :: lb_ens            (:,:)
+   real(r8), allocatable :: dz_soisno_ens   (:,:,:) 
 
    ! PUBLIC MEMBER FUNCTIONS:
    PUBLIC :: allocate_TimeVariables_ens
@@ -184,9 +143,6 @@ CONTAINS
 
          IF (numpatch > 0) THEN
 
-            ! NOTE (Lu Li): 
-            !     ensemble size cannot be placed in the last dimension, as patch size must be 
-            !     the last dimension so that is can be read or write in parallel within CoLM.
             allocate (z_sno_ens      (maxsnl+1:0,      num_ens,numpatch)); z_sno_ens       (:,:,:) = spval
             allocate (dz_sno_ens     (maxsnl+1:0,      num_ens,numpatch)); dz_sno_ens      (:,:,:) = spval
             allocate (t_soisno_ens   (maxsnl+1:nl_soil,num_ens,numpatch)); t_soisno_ens    (:,:,:) = spval
@@ -202,10 +158,6 @@ CONTAINS
             allocate (gs0sun_ens                      (num_ens,numpatch)); gs0sun_ens        (:,:) = spval
             allocate (gs0sha_ens                      (num_ens,numpatch)); gs0sha_ens        (:,:) = spval
 
-            allocate (o3coefv_sun_ens                 (num_ens,numpatch)); o3coefv_sun_ens   (:,:) = spval
-            allocate (o3coefv_sha_ens                 (num_ens,numpatch)); o3coefv_sha_ens   (:,:) = spval
-            allocate (o3coefg_sun_ens                 (num_ens,numpatch)); o3coefg_sun_ens   (:,:) = spval
-            allocate (o3coefg_sha_ens                 (num_ens,numpatch)); o3coefg_sha_ens   (:,:) = spval
             allocate (lai_old_ens                     (num_ens,numpatch)); lai_old_ens       (:,:) = spval
             allocate (o3uptakesun_ens                 (num_ens,numpatch)); o3uptakesun_ens   (:,:) = spval
             allocate (o3uptakesha_ens                 (num_ens,numpatch)); o3uptakesha_ens   (:,:) = spval
@@ -257,8 +209,7 @@ CONTAINS
             allocate (t_lake_ens              (nl_lake,num_ens,numpatch)); t_lake_ens      (:,:,:) = spval
             allocate (lake_icefrac_ens        (nl_lake,num_ens,numpatch)); lake_icefrac_ens(:,:,:) = spval
             allocate (savedtke1_ens                   (num_ens,numpatch)); savedtke1_ens     (:,:) = spval
-
-            !allocate (dz_lake_ens       (nl_lake,num_ens,numpatch)); t_lake_ens      (:,:,:) = spval
+            allocate (dz_lake_ens             (nl_lake,num_ens,numpatch)); t_lake_ens      (:,:,:) = spval
 
             allocate (snw_rds_ens          (maxsnl+1:0,num_ens,numpatch)); snw_rds_ens       (:,:,:) = spval
             allocate (mss_bcpho_ens        (maxsnl+1:0,num_ens,numpatch)); mss_bcpho_ens     (:,:,:) = spval
@@ -287,47 +238,11 @@ CONTAINS
             allocate (fh_ens                          (num_ens,numpatch)); fh_ens              (:,:) = spval
             allocate (fq_ens                          (num_ens,numpatch)); fq_ens              (:,:) = spval
             
-            allocate (irrig_rate_ens                  (num_ens,numpatch)); irrig_rate_ens                  (:,:) = spval
-            allocate (deficit_irrig_ens               (num_ens,numpatch)); deficit_irrig_ens               (:,:) = spval
-            allocate (sum_irrig_ens                   (num_ens,numpatch)); sum_irrig_ens                   (:,:) = spval
-            allocate (sum_irrig_count_ens             (num_ens,numpatch)); sum_irrig_count_ens             (:,:) = spval
-            !allocate (n_irrig_steps_left_ens          (num_ens,numpatch)); n_irrig_steps_left_ens          (:,:) = spval_i4
+            allocate (lb_ens                         (num_ens, numpatch)); lb_ens              (:,:) = spval_i4
+            allocate (dz_soisno_ens  (maxsnl+1:nl_soil,num_ens,numpatch)); dz_soisno_ens     (:,:,:) = spval
             
-            allocate (tairday_ens                     (num_ens,numpatch)); tairday_ens                     (:,:) = spval
-            allocate (usday_ens                       (num_ens,numpatch)); usday_ens                       (:,:) = spval
-            allocate (vsday_ens                       (num_ens,numpatch)); vsday_ens                       (:,:) = spval
-            allocate (pairday_ens                     (num_ens,numpatch)); pairday_ens                     (:,:) = spval
-            allocate (rnetday_ens                     (num_ens,numpatch)); rnetday_ens                     (:,:) = spval
-            allocate (fgrndday_ens                    (num_ens,numpatch)); fgrndday_ens                    (:,:) = spval
-            allocate (potential_evapotranspiration_ens(num_ens,numpatch)); potential_evapotranspiration_ens(:,:) = spval
-            allocate (lb_ens (num_ens, numpatch)); lb_ens(:,:) = spval_i4
-            allocate (dz_soisno_ens  (maxsnl+1:nl_soil,num_ens,numpatch)); dz_soisno_ens   (:,:,:) = spval
-            !allocate (irrig_method_corn_ens           (num_ens,numpatch)); irrig_method_corn_ens           (:,:) = spval_i4
-            !allocate (irrig_method_swheat_ens         (num_ens,numpatch)); irrig_method_swheat_ens         (:,:) = spval_i4
-            !allocate (irrig_method_wwheat_ens         (num_ens,numpatch)); irrig_method_wwheat_ens         (:,:) = spval_i4
-            !allocate (irrig_method_soybean_ens        (num_ens,numpatch)); irrig_method_soybean_ens        (:,:) = spval_i4
-            !allocate (irrig_method_cotton_ens         (num_ens,numpatch)); irrig_method_cotton_ens         (:,:) = spval_i4
-            !allocate (irrig_method_rice1_ens          (num_ens,numpatch)); irrig_method_rice1_ens          (:,:) = spval_i4
-            !allocate (irrig_method_rice2_ens          (num_ens,numpatch)); irrig_method_rice2_ens          (:,:) = spval_i4
-            !allocate (irrig_method_sugarcane_ens      (num_ens,numpatch)); irrig_method_sugarcane_ens      (:,:) = spval_i4
          ENDIF
       ENDIF
-
-#if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
-      CALL allocate_PFTimeVariables
-#endif
-
-#ifdef BGC
-      CALL allocate_BGCTimeVariables
-#endif
-
-#ifdef CatchLateralFlow
-      CALL allocate_HydroTimeVariables
-#endif
-
-#ifdef URBAN_MODEL
-      CALL allocate_UrbanTimeVariables
-#endif
 
    END SUBROUTINE allocate_TimeVariables_ens
 
@@ -362,10 +277,6 @@ CONTAINS
             deallocate (gs0sun_ens                 )
             deallocate (gs0sha_ens                 )
 
-            deallocate (o3coefv_sun_ens            )
-            deallocate (o3coefv_sha_ens            )
-            deallocate (o3coefg_sun_ens            )
-            deallocate (o3coefg_sha_ens            )
             deallocate (lai_old_ens                )
             deallocate (o3uptakesun_ens            )
             deallocate (o3uptakesha_ens            )
@@ -417,8 +328,7 @@ CONTAINS
             deallocate (t_lake_ens                 )
             deallocate (lake_icefrac_ens           )
             deallocate (savedtke1_ens              )
-
-            !deallocate (dz_lake_ens                )
+            deallocate (dz_lake_ens                )
 
             deallocate (snw_rds_ens                )
             deallocate (mss_bcpho_ens              )
@@ -447,88 +357,13 @@ CONTAINS
             deallocate (fh_ens                     )
             deallocate (fq_ens                     )
             
-            deallocate (irrig_rate_ens             )
-            deallocate (deficit_irrig_ens          )
-            deallocate (sum_irrig_ens              )
-            deallocate (sum_irrig_count_ens        )
-            !deallocate (n_irrig_steps_left_ens     )
-
-            deallocate (tairday_ens                )
-            deallocate (usday_ens                  )
-            deallocate (vsday_ens                  )
-            deallocate (pairday_ens                )
-            deallocate (rnetday_ens                )
-            deallocate (fgrndday_ens               )
-            deallocate (potential_evapotranspiration_ens)
             deallocate (lb_ens)
             deallocate (dz_soisno_ens              )
-
-            !deallocate (irrig_method_corn_ens      )
-            !deallocate (irrig_method_swheat_ens    )
-            !deallocate (irrig_method_wwheat_ens    )
-            !deallocate (irrig_method_soybean_ens   )
-            !deallocate (irrig_method_cotton_ens    )
-            !deallocate (irrig_method_rice1_ens     )
-            !deallocate (irrig_method_rice2_ens     )
-            !deallocate (irrig_method_sugarcane_ens )
 
          ENDIF
       ENDIF
 
-#if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
-      CALL deallocate_PFTimeVariables
-#endif
-
-#if (defined BGC)
-      CALL deallocate_BGCTimeVariables
-#endif
-
-#ifdef CatchLateralFlow
-      CALL deallocate_HydroTimeVariables
-#endif
-
-#if (defined URBAN_MODEL)
-      CALL deallocate_UrbanTimeVariables
-#endif
-
    END SUBROUTINE deallocate_TimeVariables_ens
-
-
-!-----------------------------------------------------------------------
-!    FUNCTION save_to_restart (idate, deltim, itstamp, ptstamp) result(rwrite)
-
-!    USE MOD_Namelist
-!    IMPLICIT NONE
-
-!    logical :: rwrite
-
-!    integer,  intent(in) :: idate(3)
-!    real(r8), intent(in) :: deltim
-!    type(timestamp), intent(in) :: itstamp, ptstamp
-
-
-!       ! added by yuan, 08/31/2014
-!       SELECTCASE (trim(adjustl(DEF_WRST_FREQ)))
-!       CASE ('TIMESTEP')
-!          rwrite = .true.
-!       CASE ('HOURLY')
-!          rwrite = isendofhour (idate, deltim)
-!       CASE ('DAILY')
-!          rwrite = isendofday(idate, deltim)
-!       CASE ('MONTHLY')
-!          rwrite = isendofmonth(idate, deltim)
-!       CASE ('YEARLY')
-!          rwrite = isendofyear(idate, deltim)
-!       CASE default
-!          write(*,*) 'Warning: Please USE one of TIMESTEP/HOURLY/DAILY/MONTHLY/YEARLY for restart frequency.'
-!       ENDSELECT
-
-!       IF (rwrite) THEN
-!          rwrite = ((ptstamp <= itstamp) .or. isendofyear(idate,deltim))
-!       ENDIF
-
-!    END FUNCTION save_to_restart
-
 
 
 !-----------------------------------------------------------------------
@@ -553,6 +388,7 @@ CONTAINS
    character(len=14)  :: cdate
    character(len=256) :: cyear         !character for lc_year
    integer :: compress
+   integer :: i
 
       compress = DEF_REST_CompressLevel
 
@@ -567,7 +403,7 @@ CONTAINS
       CALL mpi_barrier (p_comm_glb, p_err)
 #endif
 
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
+      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_'//trim(cdate)//'_lc'//trim(cyear)//'_ens'//'.nc'
 
       CALL ncio_create_file_vector      (file_restart, landpatch)
 
@@ -601,8 +437,8 @@ ENDIF
 
 IF (DEF_USE_OZONESTRESS) THEN
       CALL ncio_write_vector (file_restart, 'lai_old',                                 'ens', num_ens, 'patch', landpatch, lai_old_ens,     compress)
-      CALL ncio_write_vector (file_restart, 'o3coefv_sun',                             'ens', num_ens, 'patch', landpatch, o3coefv_sun_ens, compress)
-      CALL ncio_write_vector (file_restart, 'o3coefv_sha',                             'ens', num_ens, 'patch', landpatch, o3coefv_sha_ens, compress)
+      CALL ncio_write_vector (file_restart, 'o3uptakesun',                             'ens', num_ens, 'patch', landpatch, o3uptakesun_ens, compress)
+      CALL ncio_write_vector (file_restart, 'o3uptakesha',                             'ens', num_ens, 'patch', landpatch, o3uptakesha_ens, compress)
 ENDIF
 
       CALL ncio_write_vector (file_restart, 't_grnd',    'ens', num_ens, 'patch', landpatch, t_grnd_ens,    compress) ! ground surface temperature [K]
@@ -637,13 +473,16 @@ ENDIF
       CALL ncio_write_vector (file_restart, 'wdsrf',     'ens', num_ens, 'patch', landpatch, wdsrf_ens,     compress) ! depth of surface water [mm]
       CALL ncio_write_vector (file_restart, 'rss',       'ens', num_ens, 'patch', landpatch, rss_ens,       compress) ! soil surface resistance [s/m]
 
-!IF (DEF_USE_Dynamic_Lake) THEN
-!      CALL ncio_write_vector (file_restart, 'dz_lake'    , 'lake', nl_lake, 'ens', num_ens, 'patch', landpatch,  dz_lake_ens, compress)
-!ENDIF
-
+IF (DEF_USE_Dynamic_Lake) THEN
+      DO i = 1, num_ens
+          dz_lake_ens(:,i,:) = dz_lake
+      ENDDO
+      CALL ncio_write_vector (file_restart, 'dz_lake'    , 'lake', nl_lake, 'ens', num_ens, 'patch', landpatch,  dz_lake_ens, compress)
+ENDIF
       CALL ncio_write_vector (file_restart, 't_lake  '   , 'lake', nl_lake, 'ens', num_ens, 'patch', landpatch, t_lake_ens,       compress)
       CALL ncio_write_vector (file_restart, 'lake_icefrc', 'lake', nl_lake, 'ens', num_ens, 'patch', landpatch, lake_icefrac_ens, compress)
       CALL ncio_write_vector (file_restart, 'savedtke1  ', 'ens', num_ens, 'patch', landpatch, savedtke1_ens, compress)
+      
       CALL ncio_write_vector (file_restart, 'snw_rds  ', 'snow', -maxsnl, 'ens', num_ens, 'patch', landpatch, snw_rds_ens,   compress)
       CALL ncio_write_vector (file_restart, 'mss_bcpho', 'snow', -maxsnl, 'ens', num_ens, 'patch', landpatch, mss_bcpho_ens, compress)
       CALL ncio_write_vector (file_restart, 'mss_bcphi', 'snow', -maxsnl, 'ens', num_ens, 'patch', landpatch, mss_bcphi_ens, compress)
@@ -669,51 +508,10 @@ ENDIF
       CALL ncio_write_vector (file_restart, 'fm   ', 'ens', num_ens, 'patch', landpatch, fm_ens,   compress) ! integral of profile FUNCTION for momentum
       CALL ncio_write_vector (file_restart, 'fh   ', 'ens', num_ens, 'patch', landpatch, fh_ens,   compress) ! integral of profile FUNCTION for heat
       CALL ncio_write_vector (file_restart, 'fq   ', 'ens', num_ens, 'patch', landpatch, fq_ens,   compress) ! integral of profile FUNCTION for moisture
-      CALL ncio_write_vector (file_restart, 'lb', 'ens', num_ens, 'patch', landpatch,  lb_ens, compress)
-      CALL ncio_write_vector (file_restart, 'dz_soisno', 'soilsnow', nl_soil-maxsnl, 'ens', num_ens, 'patch', landpatch, dz_soisno_ens, compress)
-IF (DEF_USE_IRRIGATION) THEN
-      CALL ncio_write_vector (file_restart, 'irrig_rate                 ' , 'ens', num_ens, 'patch', landpatch,  irrig_rate_ens, compress)
-      CALL ncio_write_vector (file_restart, 'deficit_irrig              ' , 'ens', num_ens, 'patch', landpatch,  deficit_irrig_ens, compress)
-      CALL ncio_write_vector (file_restart, 'sum_irrig                  ' , 'ens', num_ens, 'patch', landpatch,  sum_irrig_ens, compress)
-      CALL ncio_write_vector (file_restart, 'sum_irrig_count            ' , 'ens', num_ens, 'patch', landpatch,  sum_irrig_count_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'n_irrig_steps_left         ' , 'ens', num_ens, 'patch', landpatch,  n_irrig_steps_left_ens, compress)
-      CALL ncio_write_vector (file_restart, 'tairday                    ' , 'ens', num_ens, 'patch', landpatch,  tairday_ens, compress)
-      CALL ncio_write_vector (file_restart, 'usday                      ' , 'ens', num_ens, 'patch', landpatch,  usday_ens, compress)
-      CALL ncio_write_vector (file_restart, 'vsday                      ' , 'ens', num_ens, 'patch', landpatch,  vsday_ens, compress)
-      CALL ncio_write_vector (file_restart, 'pairday                    ' , 'ens', num_ens, 'patch', landpatch,  pairday_ens, compress)
-      CALL ncio_write_vector (file_restart, 'rnetday                    ' , 'ens', num_ens, 'patch', landpatch,  rnetday_ens, compress)
-      CALL ncio_write_vector (file_restart, 'fgrndday                   ' , 'ens', num_ens, 'patch', landpatch,  fgrndday_ens, compress)
-      CALL ncio_write_vector (file_restart, 'potential_evapotranspiration', 'ens', num_ens, 'patch', landpatch,  potential_evapotranspiration_ens, compress)
       
-      !CALL ncio_write_vector (file_restart, 'irrig_method_corn     ' , 'ens', num_ens, 'patch', landpatch, irrig_method_corn_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'irrig_method_swheat   ' , 'ens', num_ens, 'patch', landpatch, irrig_method_swheat_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'irrig_method_wwheat   ' , 'ens', num_ens, 'patch', landpatch, irrig_method_wwheat_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'irrig_method_soybean  ' , 'ens', num_ens, 'patch', landpatch, irrig_method_soybean_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'irrig_method_cotton   ' , 'ens', num_ens, 'patch', landpatch, irrig_method_cotton_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'irrig_method_rice1    ' , 'ens', num_ens, 'patch', landpatch, irrig_method_rice1_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'irrig_method_rice2    ' , 'ens', num_ens, 'patch', landpatch, irrig_method_rice2_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'irrig_method_sugarcane' , 'ens', num_ens, 'patch', landpatch, irrig_method_sugarcane_ens, compress)
-ENDIF
+      !CALL ncio_write_vector (file_restart, 'lb', 'ens', num_ens, 'patch', landpatch,  lb_ens, compress)
+      !CALL ncio_write_vector (file_restart, 'dz_soisno', 'soilsnow', nl_soil-maxsnl, 'ens', num_ens, 'patch', landpatch, dz_soisno_ens, compress)
 
-#if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_pft_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL WRITE_PFTimeVariables (file_restart)
-#endif
-
-#if (defined BGC)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_bgc_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL WRITE_BGCTimeVariables (file_restart)
-#endif
-
-#if (defined CatchLateralFlow)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_basin_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL WRITE_HydroTimeVariables (file_restart)
-#endif
-
-#if (defined URBAN_MODEL)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_urban_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL WRITE_UrbanTimeVariables (file_restart)
-#endif
    END SUBROUTINE WRITE_TimeVariables_ens
 
 
@@ -747,14 +545,14 @@ ENDIF
 #endif
 
       IF (p_is_master) THEN
-         write(*,'(/,A26)') 'Loading Time Variables ...'
+         write(*,*) 'Loading Ensemble Time Variables ...'
       ENDIF
 
       ! land cover type year
       write(cyear,'(i4.4)') lc_year
 
       write(cdate,'(i4.4,"-",i3.3,"-",i5.5)') idate(1), idate(2), idate(3)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
+      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_'//trim(cdate)//'_lc'//trim(cyear)//'_ens'//'.nc'
 
       ! Time-varying state variables which reaquired by restart run
       CALL ncio_read_vector (file_restart, 'z_sno   '   , -maxsnl, num_ens, landpatch, z_sno_ens)             ! node depth [m]
@@ -809,10 +607,9 @@ ENDIF
       CALL ncio_read_vector (file_restart, 'wdsrf   '   , num_ens, landpatch, wdsrf_ens) ! depth of surface water [mm]
       CALL ncio_read_vector (file_restart, 'rss     '   , num_ens, landpatch, rss_ens) ! soil surface resistance [s/m]
 
-!IF (DEF_USE_Dynamic_Lake) THEN
-!      CALL ncio_read_vector (file_restart, 'dz_lake'    , nl_lake, num_ens, landpatch, dz_lake_ens)
-!ENDIF
-
+IF (DEF_USE_Dynamic_Lake) THEN
+      CALL ncio_read_vector (file_restart, 'dz_lake'    , nl_lake, num_ens, landpatch, dz_lake_ens)
+ENDIF
       CALL ncio_read_vector (file_restart, 't_lake  '   , nl_lake, num_ens, landpatch, t_lake_ens) ! lake temperature [K]
       CALL ncio_read_vector (file_restart, 'lake_icefrc', nl_lake, num_ens, landpatch, lake_icefrac_ens) ! lake ice fraction [-]
       CALL ncio_read_vector (file_restart, 'savedtke1  ', num_ens, landpatch, savedtke1_ens) ! saved tke1 [m2/s2]
@@ -842,59 +639,16 @@ ENDIF
       CALL ncio_read_vector (file_restart, 'fm   ', num_ens, landpatch, fm_ens) ! integral of profile FUNCTION for momentum
       CALL ncio_read_vector (file_restart, 'fh   ', num_ens, landpatch, fh_ens) ! integral of profile FUNCTION for heat
       CALL ncio_read_vector (file_restart, 'fq   ', num_ens, landpatch, fq_ens) ! integral of profile FUNCTION for moisture
-      CALL ncio_read_vector (file_restart, 'lb              ' , num_ens, landpatch, lb_ens)
-      CALL ncio_read_vector (file_restart, 'dz_soisno       ' , nl_soil-maxsnl, num_ens, landpatch, dz_soisno_ens)
-
-IF (DEF_USE_IRRIGATION) THEN
-      CALL ncio_read_vector (file_restart, 'irrig_rate            ' , num_ens, landpatch, irrig_rate_ens)
-      CALL ncio_read_vector (file_restart, 'deficit_irrig         ' , num_ens, landpatch, deficit_irrig_ens)
-      CALL ncio_read_vector (file_restart, 'sum_irrig             ' , num_ens, landpatch, sum_irrig_ens)
-      CALL ncio_read_vector (file_restart, 'sum_irrig_count       ' , num_ens, landpatch, sum_irrig_count_ens)
-      !CALL ncio_read_vector (file_restart, 'n_irrig_steps_left    ' , num_ens, landpatch, n_irrig_steps_left_ens)
-      CALL ncio_read_vector (file_restart, 'tairday               ' , num_ens, landpatch, tairday_ens)
-      CALL ncio_read_vector (file_restart, 'usday                 ' , num_ens, landpatch, usday_ens)
-      CALL ncio_read_vector (file_restart, 'vsday                 ' , num_ens, landpatch, vsday_ens)
-      CALL ncio_read_vector (file_restart, 'pairday               ' , num_ens, landpatch, pairday_ens)
-      CALL ncio_read_vector (file_restart, 'rnetday               ' , num_ens, landpatch, rnetday_ens)
-      CALL ncio_read_vector (file_restart, 'fgrndday              ' , num_ens, landpatch, fgrndday_ens)
-      CALL ncio_read_vector (file_restart, 'potential_evapotranspiration', num_ens, landpatch, potential_evapotranspiration_ens)
-
-      !CALL ncio_read_vector (file_restart, 'irrig_method_corn     ' , num_ens, landpatch, irrig_method_corn_ens)
-      !CALL ncio_read_vector (file_restart, 'irrig_method_swheat   ' , num_ens, landpatch, irrig_method_swheat_ens)
-      !CALL ncio_read_vector (file_restart, 'irrig_method_wwheat   ' , num_ens, landpatch, irrig_method_wwheat_ens)
-      !CALL ncio_read_vector (file_restart, 'irrig_method_soybean  ' , num_ens, landpatch, irrig_method_soybean_ens)
-      !CALL ncio_read_vector (file_restart, 'irrig_method_cotton   ' , num_ens, landpatch, irrig_method_cotton_ens)
-      !CALL ncio_read_vector (file_restart, 'irrig_method_rice1    ' , num_ens, landpatch, irrig_method_rice1_ens)
-      !CALL ncio_read_vector (file_restart, 'irrig_method_rice2    ' , num_ens, landpatch, irrig_method_rice2_ens)
-      !CALL ncio_read_vector (file_restart, 'irrig_method_sugarcane' , num_ens, landpatch, irrig_method_sugarcane_ens)
-ENDIF
-
-#if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_pft_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL READ_PFTimeVariables (file_restart)
-#endif
-
-#if (defined BGC)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_bgc_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL READ_BGCTimeVariables (file_restart)
-#endif
-
-#if (defined CatchLateralFlow)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_basin_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL READ_HydroTimeVariables (file_restart)
-#endif
-
-#if (defined URBAN_MODEL)
-      file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_urban_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
-      CALL READ_UrbanTimeVariables (file_restart)
-#endif
+      
+      !CALL ncio_read_vector (file_restart, 'lb              ' , num_ens, landpatch, lb_ens)
+      !CALL ncio_read_vector (file_restart, 'dz_soisno       ' , nl_soil-maxsnl, num_ens, landpatch, dz_soisno_ens)
 
 #ifdef RangeCheck
       CALL check_TimeVariables_ens
 #endif
 
       IF (p_is_master) THEN
-         write(*,*) 'Loading Time Variables done.'
+         write(*,*) 'Loading Ensemble Time Variables done.'
       ENDIF
 
    END SUBROUTINE READ_TimeVariables_ens
@@ -917,8 +671,28 @@ ENDIF
       CALL mpi_barrier (p_comm_glb, p_err)
 #endif
       IF (p_is_master) THEN
-         write(*,'(/,A27)') 'Checking Time Variables ...'
+         write(*,*) 'Checking Ensemble Time Variables ...'
       ENDIF
+
+      CALL check_vector_data ('z_sno       [m]    ', z_sno_ens      ) ! node depth [m]
+      CALL check_vector_data ('dz_sno      [m]    ', dz_sno_ens     ) ! interface depth [m]
+      CALL check_vector_data ('t_soisno    [K]    ', t_soisno_ens   ) ! soil temperature [K]
+      CALL check_vector_data ('wliq_soisno [kg/m2]', wliq_soisno_ens) ! liquid water in layers [kg/m2]
+      CALL check_vector_data ('wice_soisno [kg/m2]', wice_soisno_ens) ! ice lens in layers [kg/m2]
+      CALL check_vector_data ('smp         [mm]   ', smp_ens        ) ! soil matrix potential [mm]
+      CALL check_vector_data ('hk          [mm/s] ', hk_ens         ) ! hydraulic conductivity [mm h2o/s]
+
+IF (DEF_USE_PLANTHYDRAULICS) THEN
+      CALL check_vector_data ('vegwp       [m]    ', vegwp_ens      ) ! vegetation water potential [mm]
+      CALL check_vector_data ('gs0sun      []     ', gs0sun_ens     ) ! working copy of sunlit stomata conductance
+      CALL check_vector_data ('gs0sha      []     ', gs0sha_ens     ) ! working copy of shalit stomata conductance
+ENDIF
+
+IF (DEF_USE_OZONESTRESS) THEN
+      CALL check_vector_data ('lai_old     ', lai_old_ens    )
+      CALL check_vector_data ('o3uptakesun ', o3uptakesun_ens)
+      CALL check_vector_data ('o3uptakesha ', o3uptakesha_ens)
+ENDIF
 
       CALL check_vector_data ('t_grnd      [K]    ', t_grnd_ens     ) ! ground surface temperature [K]
       CALL check_vector_data ('tleaf       [K]    ', tleaf_ens      ) ! leaf temperature [K]
@@ -951,35 +725,14 @@ ENDIF
       CALL check_vector_data ('wetwat      [mm]   ', wetwat_ens     ) ! water storage in wetland [mm]
       CALL check_vector_data ('wdsrf       [mm]   ', wdsrf_ens      ) ! depth of surface water [mm]
       CALL check_vector_data ('rss         [s/m]  ', rss_ens        ) ! soil surface resistance [s/m]
+
 IF (DEF_USE_Dynamic_Lake) THEN
       CALL check_vector_data ('dz_lake     [m]    ', dz_lake_ens    )!
 ENDIF
       CALL check_vector_data ('t_lake      [K]    ', t_lake_ens     ) ! lake temperature [K]
       CALL check_vector_data ('lake_icefrc [-]    ', lake_icefrac_ens) ! lake ice fraction [-]
       CALL check_vector_data ('savedtke1   [W/m K]', savedtke1_ens   ) ! saved tke1 [m2/s2]
-      CALL check_vector_data ('z_sno       [m]    ', z_sno_ens      ) ! node depth [m]
-      CALL check_vector_data ('dz_sno      [m]    ', dz_sno_ens     ) ! interface depth [m]
-      CALL check_vector_data ('t_soisno    [K]    ', t_soisno_ens   ) ! soil temperature [K]
-      CALL check_vector_data ('wliq_soisno [kg/m2]', wliq_soisno_ens) ! liquid water in layers [kg/m2]
-      CALL check_vector_data ('wice_soisno [kg/m2]', wice_soisno_ens) ! ice lens in layers [kg/m2]
-      CALL check_vector_data ('smp         [mm]   ', smp_ens        ) ! soil matrix potential [mm]
-      CALL check_vector_data ('hk          [mm/s] ', hk_ens         ) ! hydraulic conductivity [mm h2o/s]
-
-IF (DEF_USE_PLANTHYDRAULICS) THEN
-      CALL check_vector_data ('vegwp       [m]    ', vegwp_ens      ) ! vegetation water potential [mm]
-      CALL check_vector_data ('gs0sun      []     ', gs0sun_ens     ) ! working copy of sunlit stomata conductance
-      CALL check_vector_data ('gs0sha      []     ', gs0sha_ens     ) ! working copy of shalit stomata conductance
-ENDIF
-IF (DEF_USE_OZONESTRESS) THEN
-      CALL check_vector_data ('lai_old     ', lai_old_ens    )
-      CALL check_vector_data ('o3uptakesun ', o3uptakesun_ens)
-      CALL check_vector_data ('o3uptakesha ', o3uptakesha_ens)
-      CALL check_vector_data ('o3coefv_sun ', o3coefv_sun_ens)
-      CALL check_vector_data ('o3coefv_sha ', o3coefv_sha_ens)
-      CALL check_vector_data ('o3coefg_sun ', o3coefg_sun_ens)
-      CALL check_vector_data ('o3coefg_sha ', o3coefg_sha_ens)
-ENDIF
-
+      
 IF (DEF_USE_SNICAR) THEN
       CALL check_vector_data ('snw_rds     [m-6]  ',  snw_rds_ens )
       CALL check_vector_data ('mss_bcpho   [Kg]   ',  mss_bcpho_ens )
@@ -992,37 +745,6 @@ IF (DEF_USE_SNICAR) THEN
       CALL check_vector_data ('mss_dst4    [Kg]   ',  mss_dst4_ens  )
       CALL check_vector_data ('ssno_lyr    [-]    ',  ssno_lyr_ens  )
 ENDIF
-
-IF (DEF_USE_IRRIGATION) THEN
-      CALL check_vector_data ('irrig_rate            ' , irrig_rate_ens            )
-      CALL check_vector_data ('deficit_irrig         ' , deficit_irrig_ens         )
-      CALL check_vector_data ('sum_irrig             ' , sum_irrig_ens             )
-      CALL check_vector_data ('sum_irrig_count       ' , sum_irrig_count_ens       )
-      !CALL check_vector_data ('n_irrig_steps_left    ' , n_irrig_steps_left_ens    )
-      CALL check_vector_data ('tairday               ' , tairday_ens               )
-      CALL check_vector_data ('usday                 ' , usday_ens                 )
-      CALL check_vector_data ('vsday                 ' , vsday_ens                 )
-      CALL check_vector_data ('pairday               ' , pairday_ens               )
-      CALL check_vector_data ('rnetday               ' , rnetday_ens               )
-      CALL check_vector_data ('fgrndday              ' , fgrndday_ens              )
-      CALL check_vector_data ('potential_evapotranspiration' , potential_evapotranspiration_ens)
-      !CALL check_vector_data ('irrig_method_corn     ' , irrig_method_corn_ens     )
-      !CALL check_vector_data ('irrig_method_swheat   ' , irrig_method_swheat_ens   )
-      !CALL check_vector_data ('irrig_method_wwheat   ' , irrig_method_wwheat_ens   )
-      !CALL check_vector_data ('irrig_method_soybean  ' , irrig_method_soybean_ens  )
-      !CALL check_vector_data ('irrig_method_cotton   ' , irrig_method_cotton_ens   )
-      !CALL check_vector_data ('irrig_method_rice1    ' , irrig_method_rice1_ens    )
-      !CALL check_vector_data ('irrig_method_rice2    ' , irrig_method_rice2_ens    )
-      !CALL check_vector_data ('irrig_method_sugarcane' , irrig_method_sugarcane_ens)
-ENDIF
-
-#if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
-      CALL check_PFTimeVariables
-#endif
-
-#if (defined BGC)
-      CALL check_BGCTimeVariables
-#endif
 
 #ifdef USEMPI
       CALL mpi_barrier (p_comm_glb, p_err)

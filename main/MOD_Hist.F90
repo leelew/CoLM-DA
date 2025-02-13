@@ -481,14 +481,15 @@ CONTAINS
             'total runoff','mm/s')
 
 #ifdef DataAssimilation
+         !//TODO: Lu Li
          ! slope factors for runoff [-]
-         IF (p_is_worker) THEN
-            vecacc = fslp_k_mon(month,:)
-            WHERE(vecacc /= spval) vecacc = vecacc * nac
-         ENDIF
-         CALL write_history_variable_2d ( .true., &
-            vecacc, file_hist, 'f_slope_factor_k', itime_in_file, sumarea, filter, &
-            'slope factor [k] for runoff', '-')
+         !IF (p_is_worker) THEN
+         !   vecacc = fslp_k_mon(month,:)
+         !   WHERE(vecacc /= spval) vecacc = vecacc * nac
+         !ENDIF
+         !CALL write_history_variable_2d ( .true., &
+         !   vecacc, file_hist, 'f_slope_factor_k', itime_in_file, sumarea, filter, &
+         !   'slope factor [k] for runoff', '-')
 #endif
 
 #ifdef CatchLateralFlow

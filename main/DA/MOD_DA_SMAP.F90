@@ -47,6 +47,7 @@ MODULE MOD_DA_SMAP
     logical :: has_obs, has_file
     integer :: num_obs
     integer :: num_loc_obs
+    integer :: num_loc_obs_
     real(r8), allocatable :: smap_lat  (:)                    ! latitude 
     real(r8), allocatable :: smap_lon  (:)                    ! longitude
     real(r8), allocatable :: smap_tb_h (:)                    ! H- polarized brightness temp
@@ -62,6 +63,12 @@ MODULE MOD_DA_SMAP
     real(r8), allocatable :: obs_d   (:)
     real(r8), allocatable :: obs_err (:)
 
+    real(r8), allocatable :: obs_tb_h_ (:)
+    real(r8), allocatable :: obs_tb_v_ (:)
+    real(r8), allocatable :: obs_lat_  (:)
+    real(r8), allocatable :: obs_lon_  (:)
+    real(r8), allocatable :: obs_d_    (:)
+
     ! predict tb
     real(r8), allocatable :: pred_tb_obs_ens_h (:,:)          ! predicted H- polarized temp on obs grid
     real(r8), allocatable :: pred_tb_obs_ens_v (:,:)          ! predicted V- polarized temp on obs grid
@@ -69,6 +76,8 @@ MODULE MOD_DA_SMAP
     real(r8), allocatable :: pred_tb_pset_ens_v (:,:)         ! predicted V- polarized temp on patch
     real(r8), allocatable :: pred_tb_loc_ens_h (:,:)          ! avaliable predicted tb for each patch
     real(r8), allocatable :: pred_tb_loc_ens_v (:,:)
+    real(r8), allocatable :: pred_tb_loc_ens_h_ (:,:)         ! avaliable predicted tb for each patch
+    real(r8), allocatable :: pred_tb_loc_ens_v_ (:,:)
 
     ! data assimilation
     real(r8), parameter   :: dres = 1.0                       ! search localization radius (deg)
@@ -84,7 +93,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-    SUBROUTINE allocate_SMAP (idate, deltim)
+    SUBROUTINE allocate_SMAP ()
 
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
@@ -101,10 +110,6 @@ CONTAINS
     USE MOD_RangeCheck
     IMPLICIT NONE
 
-!------------------------ Dummy Argument ------------------------------
-    real(r8), intent(in) :: deltim
-    integer, intent(in)  :: idate(3)
-
 !-----------------------------------------------------------------------
 
         ! grid file path of EASE v2.0, 36km world grid
@@ -115,6 +120,44 @@ CONTAINS
 
         ! map SMAP grid to patch
         CALL mg2p_smap%build_arealweighted (grid_smap, landpatch)
+
+    END SUBROUTINE allocate_SMAP
+
+
+
+!-----------------------------------------------------------------------------
+
+    SUBROUTINE run_DA_SMAP (idate, deltim)
+
+!-----------------------------------------------------------------------------
+    USE MOD_Spmd_task
+    USE MOD_TimeManager
+    USE MOD_NetCDFBlock
+    USE MOD_Mesh
+    USE MOD_LandElm
+    USE MOD_LandPatch
+    USE MOD_Vars_1DFluxes   
+    USE MOD_Vars_1DForcing    
+    USE MOD_Vars_TimeVariables
+    USE MOD_Vars_TimeInvariants
+    USE MOD_DA_Vars_TimeVariables
+    USE MOD_RangeCheck 
+    USE MOD_UserDefFun
+    USE MOD_DA_EnKF
+    IMPLICIT NONE
+
+!------------------------ Dummy Arguments ---------------------------------
+    integer,  intent(in) :: idate(3)
+    real(r8), intent(in) :: deltim   
+
+!------------------------ Local Variables ------------------------------
+    real(r8) :: lat_p_n, lat_p_s, lon_p_w, lon_p_e
+    integer :: ib, jb, il, jl, iens, iobs, np, i, n
+
+    type(block_data_real8_3d) :: pred_tb_grid_ens_h
+    type(block_data_real8_3d) :: pred_tb_grid_ens_v
+    
+!-----------------------------------------------------------------------------
 
         ! calculate year/month/day/hour of current step
         CALL julian2monthday(idate(1), idate(2), month, mday)
@@ -143,6 +186,8 @@ CONTAINS
                 has_obs = .true.
             ENDIF
             num_obs = size(smap_time)  ! all obs contains in current file (not constrain obs time)
+            deallocate (dt_begin)
+            deallocate (dt_end)
         ELSE
             has_obs = .false.
         ENDIF
@@ -152,6 +197,17 @@ CONTAINS
             IF (p_is_worker) THEN
                 IF (numpatch > 0) THEN
                     ! observations
+                    IF (allocated(pred_tb_obs_ens_h))   deallocate(pred_tb_obs_ens_h)
+                    IF (allocated(pred_tb_obs_ens_v))   deallocate(pred_tb_obs_ens_v)
+                    IF (allocated(pred_tb_pset_ens_h))  deallocate(pred_tb_pset_ens_h)
+                    IF (allocated(pred_tb_pset_ens_v))  deallocate(pred_tb_pset_ens_v)
+                    IF (allocated(smap_lat))     deallocate(smap_lat)
+                    IF (allocated(smap_lon))     deallocate(smap_lon)
+                    IF (allocated(smap_tb_h))    deallocate(smap_tb_h)
+                    IF (allocated(smap_tb_v))    deallocate(smap_tb_v)
+                    IF (allocated(smap_ii))      deallocate(smap_ii)
+                    IF (allocated(smap_jj))      deallocate(smap_jj)
+
                     allocate (smap_lat   (num_obs))
                     allocate (smap_lon   (num_obs))
                     allocate (smap_tb_h  (num_obs))
@@ -166,47 +222,14 @@ CONTAINS
             ENDIF
         ENDIF
 
-    END SUBROUTINE allocate_SMAP
-
-
-
-!-----------------------------------------------------------------------------
-
-    SUBROUTINE run_DA_SMAP ()
-
-!-----------------------------------------------------------------------------
-    USE MOD_Spmd_task
-    USE MOD_TimeManager
-    USE MOD_NetCDFBlock
-    USE MOD_Mesh
-    USE MOD_LandElm
-    USE MOD_LandPatch
-    USE MOD_Vars_1DFluxes       
-    USE MOD_Vars_TimeVariables
-    USE MOD_Vars_TimeInvariants
-    USE MOD_DA_Vars_TimeVariables
-    USE MOD_RangeCheck 
-    USE MOD_UserDefFun
-    USE MOD_DA_EnKF
-    IMPLICIT NONE
-
-!------------------------ Local Variables ------------------------------
-    real(r8) :: lat_p_n, lat_p_s, lon_p_w, lon_p_e
-    integer :: ib, jb, il, jl, iens, iobs, np, i, n
-
-    type(block_data_real8_3d) :: pred_tb_grid_ens_h
-    type(block_data_real8_3d) :: pred_tb_grid_ens_v
-    
-!-----------------------------------------------------------------------------
-
         ! read obs 
         IF (has_obs) THEN
             
             CALL ncio_read_bcast_serial (file_smap, 'lat' , smap_lat)
             CALL ncio_read_bcast_serial (file_smap, 'lon' , smap_lon)
             CALL ncio_read_bcast_serial (file_smap, 'ii'  , smap_ii)
-            CALL ncio_read_bcast_serial (file_smap, 'jj'  , smap_jj)
-            CALL ncio_read_bcast_serial (file_smap, 'tb_h', smap_tb_h)
+            CALL ncio_read_bcast_serial (file_smap, 'jj'  , smap_jj)  !//TODO: Lu Li: check the index of grid using one file
+            CALL ncio_read_bcast_serial (file_smap, 'tb_h', smap_tb_h)  !K
             CALL ncio_read_bcast_serial (file_smap, 'tb_v', smap_tb_v)
 
             ! forward model
@@ -230,12 +253,17 @@ CONTAINS
             ! crop the predicted obs to the same size as the obs
             IF (p_is_worker) THEN
                 DO i = 1, num_obs
-                    ib = grid_smap%xblk(smap_ii(i))
-                    jb = grid_smap%yblk(smap_jj(i))
-                    il = grid_smap%xloc(smap_ii(i))
-                    jl = grid_smap%yloc(smap_jj(i)) 
-                    pred_tb_obs_ens_h(i,:) = pred_tb_grid_ens_h%blk(ib, jb)%val(:, il, jl)
-                    pred_tb_obs_ens_v(i,:) = pred_tb_grid_ens_v%blk(ib, jb)%val(:, il, jl)
+                    ib = grid_smap%xblk(smap_jj(i)+1) ! diff of fortran and python index
+                    jb = grid_smap%yblk(smap_ii(i)+1)
+                    il = grid_smap%xloc(smap_jj(i)+1)
+                    jl = grid_smap%yloc(smap_ii(i)+1) 
+                    IF (ib == 0 .or. jb == 0) THEN  ! out of block
+                        pred_tb_obs_ens_h(i,:) = -9999.0
+                        pred_tb_obs_ens_v(i,:) = -9999.0
+                    ELSE
+                        pred_tb_obs_ens_h(i,:) = pred_tb_grid_ens_h%blk(ib, jb)%val(:, il, jl)
+                        pred_tb_obs_ens_v(i,:) = pred_tb_grid_ens_v%blk(ib, jb)%val(:, il, jl)
+                    ENDIF
                 ENDDO
             ENDIF            
         
@@ -273,7 +301,7 @@ CONTAINS
                     allocate (obs_lat           (num_loc_obs))
                     allocate (obs_lon           (num_loc_obs))
                     allocate (obs_d             (num_loc_obs))
-                    allocate (obs_err           (num_loc_obs))
+                    !allocate (obs_err           (num_loc_obs))
                     allocate (pred_tb_loc_ens_h (num_loc_obs,num_ens))
                     allocate (pred_tb_loc_ens_v (num_loc_obs,num_ens))
                     obs_tb_h = smap_tb_h(obs_index)
@@ -283,13 +311,57 @@ CONTAINS
                     obs_d = sqrt((obs_lat - patchlatr(np))**2 + (obs_lon - patchlonr(np))**2)
                     pred_tb_loc_ens_h = pred_tb_obs_ens_h(obs_index,:)
                     pred_tb_loc_ens_v = pred_tb_obs_ens_v(obs_index,:)
-                    
-                    ! data assimilation
-                    obs_err(:) = 0.04   ! for SMAP
-                    CALL letkf( &
-                        num_ens, num_loc_obs, num_state, &
-                        h2osoi_ens(:,:,np), pred_tb_loc_ens_h, obs_tb_h, obs_err, obs_d, loc_r, infl, &
-                        h2osoi(:,np), trans, h2osoi_ens(:,:,np))
+
+
+
+                    ! remove NaN obs
+                    num_loc_obs_ = count (pred_tb_loc_ens_h(:,1) > 0)
+                    IF (num_loc_obs_ > 0) THEN
+                        allocate (obs_tb_h_ (num_loc_obs_))
+                        allocate (obs_tb_v_ (num_loc_obs_))
+                        allocate (obs_lat_  (num_loc_obs_))
+                        allocate (obs_lon_  (num_loc_obs_))
+                        allocate (obs_d_    (num_loc_obs_))
+                        allocate (obs_err   (num_loc_obs_))
+                        allocate (pred_tb_loc_ens_h_ (num_loc_obs_,num_ens))
+                        allocate (pred_tb_loc_ens_v_ (num_loc_obs_,num_ens))
+
+                        obs_tb_h_ = PACK(obs_tb_h, pred_tb_loc_ens_h(:,1) > 0)
+                        obs_tb_v_ = PACK(obs_tb_v, pred_tb_loc_ens_h(:,1) > 0)
+                        obs_lat_ = PACK(obs_lat, pred_tb_loc_ens_h(:,1) > 0)
+                        obs_lon_ = PACK(obs_lon, pred_tb_loc_ens_h(:,1) > 0)
+                        obs_d_ = PACK(obs_d, pred_tb_loc_ens_h(:,1) > 0)
+                        DO i = 1, num_ens
+                            pred_tb_loc_ens_h_(:,i) = PACK(pred_tb_loc_ens_h(:,i), pred_tb_loc_ens_h(:,1) > 0)
+                            pred_tb_loc_ens_v_(:,i) = PACK(pred_tb_loc_ens_v(:,i), pred_tb_loc_ens_h(:,1) > 0)
+                        ENDDO
+                        
+                        ! data assimilation
+                        obs_err(:) = 0.04   ! for SMAP
+                        CALL letkf( &
+                            num_ens, num_loc_obs_, num_state, &
+                            h2osoi_ens(:,:,np), pred_tb_loc_ens_h_, obs_tb_h_, obs_err, obs_d_, loc_r, infl, &
+                            h2osoi(:,np), trans, h2osoi_ens(:,:,np))
+                    ELSE
+                        print *, 'No avaliable obs for patch ', np
+                    ENDIF
+
+                    IF (allocated(obs_index))    deallocate(obs_index)
+                    IF (allocated(obs_tb_h))     deallocate(obs_tb_h)
+                    IF (allocated(obs_tb_v))     deallocate(obs_tb_v)
+                    IF (allocated(obs_lat))      deallocate(obs_lat)
+                    IF (allocated(obs_lon))      deallocate(obs_lon)
+                    IF (allocated(obs_d))        deallocate(obs_d)
+                    IF (allocated(obs_err))      deallocate(obs_err)
+                    IF (allocated(obs_tb_h_))    deallocate(obs_tb_h_)
+                    IF (allocated(obs_tb_v_))    deallocate(obs_tb_v_)
+                    IF (allocated(obs_lat_))     deallocate(obs_lat_)
+                    IF (allocated(obs_lon_))     deallocate(obs_lon_)
+                    IF (allocated(obs_d_))       deallocate(obs_d_)
+                    IF (allocated(pred_tb_loc_ens_h))    deallocate(pred_tb_loc_ens_h)
+                    IF (allocated(pred_tb_loc_ens_v))    deallocate(pred_tb_loc_ens_v)
+                    IF (allocated(pred_tb_loc_ens_h_))   deallocate(pred_tb_loc_ens_h_)
+                    IF (allocated(pred_tb_loc_ens_v_))   deallocate(pred_tb_loc_ens_v_)
                 ENDDO
             ENDIF
         ENDIF
@@ -325,6 +397,11 @@ CONTAINS
         IF (allocated(obs_lon))      deallocate(obs_lon)
         IF (allocated(obs_d))        deallocate(obs_d)
         IF (allocated(obs_err))      deallocate(obs_err)
+        IF (allocated(obs_tb_h_))    deallocate(obs_tb_h_)
+        IF (allocated(obs_tb_v_))    deallocate(obs_tb_v_)
+        IF (allocated(obs_lat_))     deallocate(obs_lat_)
+        IF (allocated(obs_lon_))     deallocate(obs_lon_)
+        IF (allocated(obs_d_))       deallocate(obs_d_)
 
         ! predicted
         IF (allocated(pred_tb_obs_ens_h))   deallocate(pred_tb_obs_ens_h)
@@ -333,6 +410,10 @@ CONTAINS
         IF (allocated(pred_tb_pset_ens_v))  deallocate(pred_tb_pset_ens_v)
         IF (allocated(pred_tb_loc_ens_h))   deallocate(pred_tb_loc_ens_h)
         IF (allocated(pred_tb_loc_ens_v))   deallocate(pred_tb_loc_ens_v)
+        IF (allocated(pred_tb_loc_ens_h_))  deallocate(pred_tb_loc_ens_h_)
+        IF (allocated(pred_tb_loc_ens_v_))  deallocate(pred_tb_loc_ens_v_)
+
+
        
     END SUBROUTINE deallocate_SMAP
 

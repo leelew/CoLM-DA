@@ -92,6 +92,9 @@ SUBROUTINE CoLMMAIN ( &
            srviln,       srndln,       srniln,       qcharge,      &
            xerr,         zerr,         &
 
+#ifdef DataAssimilation
+           lb,           dz_soisno,                                &
+#endif
          ! TUNABLE modle constants
            zlnd,         zsno,         csoilc,       dewmx,        &
            ! 'wtfact' is updated to gridded 'fsatmax' data.
@@ -475,6 +478,16 @@ SUBROUTINE CoLMMAIN ( &
         fh          ,&! integral of profile function for heat
         fq            ! integral of profile function for moisture
 
+#ifdef DataAssimilation
+   !dummy args
+   integer, intent(out)  :: lb      ! lower bound of arrays
+   real(r8), intent(out) :: dz_soisno(maxsnl+1:nl_soil)  ! layer thickness (m)
+#else 
+   !local vars
+   integer :: lb
+   real(r8) :: dz_soisno(maxsnl+1:nl_soil)  ! layer thickness (m)
+#endif
+
 ! ----------------------- Local  Variables -----------------------------
    logical  :: is_dry_lake
 
@@ -510,7 +523,7 @@ SUBROUTINE CoLMMAIN ( &
         totwb       ,&! water mass at the begining of time step
         wt          ,&! fraction of vegetation buried (covered) by snow [-]
         z_soisno (maxsnl+1:nl_soil), &! layer depth (m)
-        dz_soisno(maxsnl+1:nl_soil), &! layer thickness (m)
+        !dz_soisno(maxsnl+1:nl_soil), &! layer thickness (m)
         zi_soisno(maxsnl  :nl_soil)   ! interface level below a "z" level (m)
 
    real(r8) :: &
@@ -527,7 +540,8 @@ SUBROUTINE CoLMMAIN ( &
 
    integer snl      ,&! number of snow layers
         imelt(maxsnl+1:nl_soil), &! flag for: melting=1, freezing=2, Nothing happended=0
-        lb ,lbsn    ,&! lower bound of arrays
+        !lb ,         &
+        lbsn    ,&! lower bound of arrays
         j             ! do looping index
 
    ! For SNICAR snow model

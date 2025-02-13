@@ -116,7 +116,7 @@ MODULE MOD_Vars_Global
    integer , parameter :: irrig_time_per_day = 14400         ! irrigation last time
 
 #ifdef DataAssimilation
-   integer, parameter :: num_ens = 20
+   integer, parameter :: num_ens = 5
 #endif
 
    ! PUBLIC MEMBER FUNCTIONS:
