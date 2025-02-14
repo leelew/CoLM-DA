@@ -20,7 +20,6 @@ MODULE MOD_DA_ObsOperator
 ! PUBLIC MEMBER FUNCTIONS:
     PUBLIC :: forward
 
-! PRIVATE MEMBER FUNCTIONS:
 
 !-----------------------------------------------------------------------
 

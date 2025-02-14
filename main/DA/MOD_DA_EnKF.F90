@@ -1,12 +1,19 @@
 #include <define.h>
+
 #ifdef DataAssimilation
-
 MODULE MOD_DA_EnKF
-
+!-----------------------------------------------------------------------
+! DESCRIPTION:
+!    ensemble Kalman filter (EnKF) 
+! 
+! AUTHOR:
+! Lu Li, 12/2024: Initial version
+!-----------------------------------------------------------------------
     USE MOD_Precision
     IMPLICIT NONE
     SAVE
 
+! public functions
     PUBLIC :: letkf
 
 
@@ -21,13 +28,13 @@ CONTAINS
         A, HA, y, R, loc_d, loc_r, infl, &
         A_analysis_mean, trans, A_analysis_ens)
 
-!=======================================================================
+!-----------------------------------------------------------------------
 ! Description:
 !   local transform ensemble Kalman filter 
 !
 ! Original author : 
 !   Lu Li, 12/2024
-!=======================================================================
+!-----------------------------------------------------------------------
     USE MOD_Precision
     IMPLICIT NONE
 
@@ -87,15 +94,15 @@ CONTAINS
 
         ! calculate C, intermediate matrix in localized observation 
         dHA_t = transpose(dHA) !(kxl)
-        DO i = 1, num_obs
-            C(:,j) = dHA_t(:,j) / (R(j)*(exp((-loc_d(j)**2)/(2*loc_r**2)))) !(kxl)
+        DO j = 1, num_obs
+            C(:,j) = dHA_t(:,j) / (R(j))!*(exp((-loc_d(j)**2)/(2*loc_r**2)))) !(kxl) !//TODO: Lu Li: add localization
         ENDDO
 
         ! calculate C*dHA, intermediate matrix in background error M1 
         CALL dgemm('N', 'N', num_ens, num_ens, num_obs, 1.0d0, C, num_ens, dHA, num_ens, 0.0d0, M1, num_ens) !(kxk)
 
         ! calculate inverse of background error 
-        DO j = 1, num_ens
+        DO i = 1, num_ens
             pa_inv(i,i) = M1(i,i) + (num_ens-1)*1.0d0/infl !(kxk)
         ENDDO
 
@@ -106,7 +113,7 @@ CONTAINS
         eigvec = pa_inv !(kxk)
 
         ! calculate background error covariance matrix pa = eigvec (eigval)^-1 eigvec^T
-        DO j = 1, num_ens
+        DO i = 1, num_ens
             M2(:,i) = eigvec(:,i) / eigval(i) !(kxk)
         ENDDO
         CALL dgemm('N', 'T', num_ens, num_ens, num_obs, 1.0d0, M2, num_ens, eigvec, num_ens, 0.0d0, pa, num_ens) !(kxk)
@@ -140,6 +147,8 @@ CONTAINS
         ENDDO
 
     END SUBROUTINE letkf
+
+
 
 !-----------------------------------------------------------------------
 END MODULE MOD_DA_EnKF

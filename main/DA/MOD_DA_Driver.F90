@@ -1,62 +1,61 @@
 #include <define.h>
+
 #ifdef DataAssimilation
-
 SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
-
-!=======================================================================
-!
-! CoLM ensemble MODEL DRIVER for data assimilation
-!
-! Initial : Yongjiu Dai, 1999-2014
-! Revised : Lu Li 2024
-!
-!=======================================================================
-
-  USE MOD_Precision
-  USE MOD_Const_Physical, only: tfrz, rgas, vonkar
-  USE MOD_Const_LC
-  USE MOD_Vars_Global
-  USE MOD_Vars_TimeInvariants
-  USE MOD_Vars_TimeVariables
-  USE MOD_Vars_1DForcing
-  USE MOD_Vars_1DFluxes
-  USE MOD_LandPatch, only: numpatch
-  USE MOD_LandUrban, only: patch2urban
-  USE MOD_Namelist, only: DEF_forcing, DEF_URBAN_RUN
-  USE MOD_Forcing, only: forcmask_pch
-  USE omp_lib
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!    Ensemble drivers of data assimilation
+! 
+! AUTHOR:
+!   Lu Li, 12/2024: Initial version, based on SMAP L1C TB data
+!-----------------------------------------------------------------------------
+    USE MOD_Precision
+    USE MOD_Const_Physical, only: tfrz, rgas, vonkar
+    USE MOD_Const_LC
+    USE MOD_Vars_Global
+    USE MOD_Vars_TimeInvariants
+    USE MOD_Vars_TimeVariables
+    USE MOD_Vars_1DForcing
+    USE MOD_Vars_1DFluxes
+    USE MOD_LandPatch, only: numpatch
+    USE MOD_LandUrban, only: patch2urban
+    USE MOD_Namelist, only: DEF_forcing, DEF_URBAN_RUN
+    USE MOD_Forcing, only: forcmask_pch
+    USE omp_lib
 #ifdef CaMa_Flood
-! get flood variables: inundation depth[mm], inundation fraction [0-1],
-! inundation evaporation [mm/s], inundation re-infiltration[mm/s]
-  USE MOD_CaMa_Vars, only : flddepth_cama,fldfrc_cama,fevpg_fld,finfg_fld
+    USE MOD_CaMa_Vars, only : flddepth_cama,fldfrc_cama,fevpg_fld,finfg_fld
 #endif
-  USE MOD_DA_Ensemble
-  USE MOD_DA_Vars_TimeVariables
-  IMPLICIT NONE
+    USE MOD_DA_Ensemble
+    USE MOD_DA_Vars_TimeVariables
+    IMPLICIT NONE
 
-  integer,  intent(in) :: idate(3) ! model calendar for next time step (year, julian day, seconds)
-  real(r8), intent(in) :: deltim   ! seconds in a time-step
+!-------------------Dummy arguments-------------------------------------------
+    integer,  intent(in) :: idate(3) ! model calendar for next time step (year, julian day, seconds)
+    real(r8), intent(in) :: deltim   ! seconds in a time-step
 
-  logical,  intent(in) :: dolai    ! true if time for time-varying vegetation paramter
-  logical,  intent(in) :: doalb    ! true if time for surface albedo calculation
-  logical,  intent(in) :: dosst    ! true if time for update sst/ice/snow
+    logical,  intent(in) :: dolai    ! true if time for time-varying vegetation paramter
+    logical,  intent(in) :: doalb    ! true if time for surface albedo calculation
+    logical,  intent(in) :: dosst    ! true if time for update sst/ice/snow
 
-  real(r8), intent(inout) :: oro(numpatch)  ! ocean(0)/seaice(2)/ flag
+    real(r8), intent(inout) :: oro(numpatch)  ! ocean(0)/seaice(2)/ flag
 
-  real(r8) :: deltim_phy
-  integer  :: steps_in_one_deltim
-  integer  :: i, m, u, k, j
+!-------------------Local variables-------------------------------------------
+    real(r8) :: deltim_phy
+    integer  :: steps_in_one_deltim
+    integer  :: i, m, u, k, j
 
-  real(r8) :: &
-    forc_t_ens(num_ens), &
-    forc_rain_ens(num_ens), &
-    forc_snow_ens(num_ens), &
-    forc_prc_ens(num_ens), &
-    forc_prl_ens(num_ens), &
-    forc_sols_ens(num_ens), &
-    forc_soll_ens(num_ens), &
-    forc_solsd_ens(num_ens), &
-    forc_solld_ens(num_ens)
+    real(r8) :: &
+      forc_t_ens(num_ens), &
+      forc_rain_ens(num_ens), &
+      forc_snow_ens(num_ens), &
+      forc_prc_ens(num_ens), &
+      forc_prl_ens(num_ens), &
+      forc_sols_ens(num_ens), &
+      forc_soll_ens(num_ens), &
+      forc_solsd_ens(num_ens), &
+      forc_solld_ens(num_ens)
+
+!-----------------------------------------------------------------------------
 
 #ifdef OPENMP
 !$OMP PARALLEL DO NUM_THREADS(OPENMP) &
@@ -64,9 +63,9 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
 !$OMP SCHEDULE(STATIC, 1)
 #endif
 
-
     DO j = 1, num_ens
       DO i = 1, numpatch
+
           ! generate ensemble samples by forcing
           CALL disturb_forc_ens( &
             num_ens, &
@@ -90,7 +89,7 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
           steps_in_one_deltim = 1
           ! deltim need to be within 1800s for waterbody with snow in order to avoid large
           ! temperature fluctuations due to rapid snow heat conductance
-          IF(m == WATERBODY .and. snowdp(i) > 0.0) steps_in_one_deltim = ceiling(deltim/1800.)
+          IF (m == WATERBODY .and. snowdp(i) > 0.0) steps_in_one_deltim = ceiling(deltim/1800.)
           deltim_phy = deltim/steps_in_one_deltim
 
           ! For non urban patch or slab urban
@@ -99,7 +98,8 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
             DO k = 1, steps_in_one_deltim
                 !                ***** Call CoLM main program *****
                 !
-                CALL CoLMMAIN (i,idate,           coszen_ens(j,i),       deltim_phy,      &
+                CALL CoLMMAIN ( &
+                i,               idate,           coszen_ens(j,i), deltim_phy,      &
                 patchlonr(i),    patchlatr(i),    patchclass(i),   patchtype(i),    &
                 doalb,           dolai,           dosst,           oro(i),          &
 
@@ -115,12 +115,11 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
                 hksati(1:,i),    csol(1:,i),      k_solids(1:,i),  dksatu(1:,i),    &
                 dksatf(1:,i),    dkdry(1:,i),     BA_alpha(1:,i),  BA_beta(1:,i),   &
                 rootfr(1:,m),    lakedepth(i),    dz_lake(1:,i),   topostd(i),      &
-                BVIC(i),                                                          &
+                BVIC(i),                                                            &
 #if(defined CaMa_Flood)
               ! flood variables [mm, m2/m2, mm/s, mm/s]
                 flddepth_cama(i),fldfrc_cama(i),fevpg_fld(i),  finfg_fld(i),        &
 #endif
-
               ! VEGETATION INFORMATION
                 htop(i),         hbot(i),         sqrtdi(m),                        &
                 effcon(m),       vmax25(m),                                         &
@@ -138,11 +137,11 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
                 forc_rain_ens(j),forc_snow_ens(j),forc_psrf(i),     forc_pbot(i),     &
                 forc_sols_ens(j),forc_soll_ens(j),forc_solsd_ens(j),forc_solld_ens(j),&
                 forc_frl(i),     forc_hgt_u(i),   forc_hgt_t(i),    forc_hgt_q(i),    &
-                forc_rhoair(i),                                                     &
+                forc_rhoair(i),                                                       &
               ! CBL height forcing
-                forc_hpbl(i),                                                       &
+                forc_hpbl(i),                                                         &
               ! Aerosol deposition
-                forc_aerdep(:,i),                                                   &
+                forc_aerdep(:,i),                                                     &
 
               ! LAND SURFACE VARIABLES REQUIRED FOR RESTART
                 z_sno_ens(maxsnl+1:,j,i),         dz_sno_ens(maxsnl+1:,j,i),        &
@@ -153,36 +152,36 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
                 snowdp_ens(j,i),       fveg_ens(j,i),         fsno_ens(j,i),         sigf_ens(j,i),         &
                 green_ens(j,i),        lai_ens(j,i),          sai_ens(j,i),          alb_ens(1:,1:,j,i),    &
                 ssun_ens(1:,1:,j,i),   ssha_ens(1:,1:,j,i),   ssoi_ens(:,:,j,i),     ssno_ens(:,:,j,i),     &
-                thermk_ens(j,i),       extkb_ens(j,i),        extkd_ens(j,i),  vegwp_ens(1:,j,i),     &
-                gs0sun_ens(j,i), gs0sha_ens(j,i),       &
+                thermk_ens(j,i),       extkb_ens(j,i),        extkd_ens(j,i),        vegwp_ens(1:,j,i),     &
+                gs0sun_ens(j,i),       gs0sha_ens(j,i),                                                     &
+
               ! Ozone Stress Variables
-                lai_old_ens(j,i), o3uptakesun_ens(j,i), o3uptakesha_ens(j,i), forc_ozone(i),   &
-              ! End ozone stress variables
+                lai_old_ens(j,i),      o3uptakesun_ens(j,i),  o3uptakesha_ens(j,i),  forc_ozone(i),         &
+
               ! WUE stomata model parameter
-                lambda(m),                                                          &
-              ! End WUE model parameter
+                lambda(m),                                                                                  &
                 zwt_ens(j,i),          wdsrf_ens(j,i),        wa_ens(j,i),           wetwat_ens(j,i),       &
-                t_lake_ens(1:,j,i),    lake_icefrac_ens(1:,j,i),               savedtke1_ens(j,i),    &
+                t_lake_ens(1:,j,i),    lake_icefrac_ens(1:,j,i),               savedtke1_ens(j,i),          &
 
               ! SNICAR snow model related
-                snw_rds_ens(:,j,i),    ssno_lyr_ens(:,:,:,j,i),                                 &
+                snw_rds_ens(:,j,i),    ssno_lyr_ens(:,:,:,j,i),                                             &
                 mss_bcpho_ens(:,j,i),  mss_bcphi_ens(:,j,i),  mss_ocpho_ens(:,j,i),  mss_ocphi_ens(:,j,i),  &
                 mss_dst1_ens(:,j,i),   mss_dst2_ens(:,j,i),   mss_dst3_ens(:,j,i),   mss_dst4_ens(:,j,i),   &
 
               ! additional diagnostic variables for output
-                laisun_ens(j,i),       laisha_ens(j,i),       rootr_ens(1:,j,i),rootflux_ens(1:,j,i),rss_ens(j,i),&
-                rstfacsun_out_ens(j,i),rstfacsha_out_ens(j,i),gssun_out_ens(j,i),gssha_out_ens(j,i),    &
-                assimsun_out_ens(j,i), etrsun_out_ens(j,i),   assimsha_out_ens(j,i), etrsha_out_ens(j,i),   &
-                h2osoi_ens(1:,j,i),    wat_ens(j,i),          &
+                laisun_ens(j,i),       laisha_ens(j,i),       rootr_ens(1:,j,i),     rootflux_ens(1:,j,i), rss_ens(j,i),&
+                rstfacsun_out_ens(j,i),rstfacsha_out_ens(j,i),gssun_out_ens(j,i),    gssha_out_ens(j,i),                &
+                assimsun_out_ens(j,i), etrsun_out_ens(j,i),   assimsha_out_ens(j,i), etrsha_out_ens(j,i),               &
+                h2osoi_ens(1:,j,i),    wat_ens(j,i),                                                                    &
 
               ! FLUXES
                 taux(i),         tauy(i),         fsena(i),        fevpa(i),        &
                 lfevpa(i),       fsenl(i),        fevpl(i),        etr(i),          &
                 fseng(i),        fevpg(i),        olrg(i),         fgrnd(i),        &
-                trad_ens(j,i),         tref_ens(j,i),         qref_ens(j,i),                          &
+                trad_ens(j,i),   tref_ens(j,i),   qref_ens(j,i),                    &
                 rsur(i),         rsur_se(i),      rsur_ie(i),      rnof(i),         &
                 qintr(i),        qinfl(i),        qdrip(i),                         &
-                rst_ens(j,i),          assim(i),        respc(i),        sabvsun(i),      &
+                rst_ens(j,i),    assim(i),        respc(i),        sabvsun(i),      &
                 sabvsha(i),      sabg(i),         sr(i),           solvd(i),        &
                 solvi(i),        solnd(i),        solni(i),        srvd(i),         &
                 srvi(i),         srnd(i),         srni(i),         solvdln(i),      &
@@ -190,19 +189,19 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
                 srviln(i),       srndln(i),       srniln(i),       qcharge(i),      &
                 xerr(i),         zerr(i),                                           &
 
-                lb_ens(j,i),           dz_soisno_ens(maxsnl+1:,j,i), &
+              ! data assimilation variables
+                lb_ens(j,i),     dz_soisno_ens(maxsnl+1:,j,i),                      &
+
               ! TUNABLE modle constants
                 zlnd,            zsno,            csoilc,          dewmx,           &
-                ! 'wtfact' is updated to gridded 'fsatmax' data.
-                capr,            cnfac,           ssi,             &
+                capr,            cnfac,           ssi,                              &
                 wimp,            pondmx,          smpmax,          smpmin,          &
                 trsmx0,          tcrit,                                             &
 
               ! additional variables required by coupling with WRF model
-                emis_ens(j,i),         z0m_ens(j,i),          zol_ens(j,i),          rib_ens(j,i),          &
+                emis_ens(j,i),         z0m_ens(j,i),          zol_ens(j,i),    rib_ens(j,i),          &
                 ustar_ens(j,i),        qstar_ens(j,i),        tstar_ens(j,i),                         &
-                fm_ens(j,i),           fh_ens(j,i),           fq_ens(j,i) )
-
+                fm_ens(j,i),           fh_ens(j,i),           fq_ens(j,i)                             )
             ENDDO
           ENDIF
 
@@ -355,19 +354,13 @@ SUBROUTINE DADRIVER (idate,deltim,dolai,doalb,dosst,oro)
       ENDDO
     ENDDO
 
-    !deallocate (forc_rain_ens )
-    !deallocate (forc_snow_ens )
-    !deallocate (forc_sols_ens )
-    !deallocate (forc_soll_ens )
-    !deallocate (forc_solsd_ens)
-    !deallocate (forc_solld_ens)
-    !deallocate (forc_frl_ens  )
 
 #ifdef OPENMP
 !$OMP END PARALLEL DO
 #endif
 
+
 END SUBROUTINE DADRIVER
+!-----------------------------------------------------------------------------
 #endif
 
-! ---------- EOP ------------

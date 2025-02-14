@@ -280,8 +280,8 @@ PROGRAM CoLM
 
 #ifdef DataAssimilation
       ! Read in the model time varying data (model state variables) for ensemble
-      CALL allocate_TimeVariables_ens()
-      CALL READ_TimeVariables_ens(jdate, lc_year, casename, dir_restart)   
+      CALL allocate_TimeVariables_ens ()
+      CALL READ_TimeVariables_ens (jdate, lc_year, casename, dir_restart)   
 #endif
 
       ! Read in SNICAR optical and aging parameters
@@ -345,7 +345,8 @@ PROGRAM CoLM
 #endif
 
 #ifdef DataAssimilation
-      CALL init_DataAssimilation ()
+      ! initialize data assimilation 
+      CALL init_DA ()
 #endif
 
       ! ======================================================================
@@ -434,6 +435,7 @@ PROGRAM CoLM
          ! ----------------------------------------------------------------------
          IF (p_is_worker) THEN
 #ifdef DataAssimilation
+            ! ensemble driver for data assimilation
             CALL DADRIVER (idate,deltim,dolai,doalb,dosst,oroflag)
 #else
             CALL CoLMDRIVER (idate,deltim,dolai,doalb,dosst,oroflag)
@@ -450,7 +452,8 @@ PROGRAM CoLM
 #endif
 
 #ifdef DataAssimilation
-         CALL do_DataAssimilation (idate, deltim)
+         ! perform data assimilation
+         CALL run_DA (idate, deltim)
 #endif
 
          ! Write out the model variables for restart run and the histroy file
@@ -534,6 +537,7 @@ PROGRAM CoLM
 #else
             CALL WRITE_TimeVariables (jdate, lc_year,  casename, dir_restart)
 #ifdef DataAssimilation
+            ! write ensemble restart file
             CALL WRITE_TimeVariables_ens(jdate, lc_year, casename, dir_restart)
 #endif            
 #endif
@@ -547,7 +551,12 @@ PROGRAM CoLM
 
 #ifdef RangeCheck
          CALL check_TimeVariables ()
+#ifdef DataAssimilation
+         ! check ensemble restart file
+         CALL check_TimeVariables_ens ()
 #endif
+#endif
+
 #ifdef USEMPI
          CALL mpi_barrier (p_comm_glb, p_err)
 #endif
@@ -587,7 +596,9 @@ PROGRAM CoLM
       CALL deallocate_TimeInvariants ()
       CALL deallocate_TimeVariables  ()
 #ifdef DataAssimilation
+      ! deallocate ensemble restart file
       CALL deallocate_TimeVariables_ens()
+      CALL end_DA ()
 #endif
       CALL deallocate_1D_Forcing     ()
       CALL deallocate_1D_Fluxes      ()
@@ -610,10 +621,6 @@ PROGRAM CoLM
 
 #if(defined CaMa_Flood)
       CALL colm_cama_exit ! finalize CaMa-Flood
-#endif
-
-#ifdef DataAssimilation
-      CALL final_DataAssimilation ()
 #endif
 
       IF (p_is_master) THEN

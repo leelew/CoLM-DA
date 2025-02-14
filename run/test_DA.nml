@@ -2,10 +2,10 @@
 
   DEF_CASE_NAME = 'test_DA'
 
-  DEF_domain%edges = -15.0
-  DEF_domain%edgen = -9.9
-  DEF_domain%edgew = 128.6
-  DEF_domain%edgee = 133.7
+  DEF_domain%edges = 32.4
+  DEF_domain%edgen = 37.5
+  DEF_domain%edgew = 80.5
+  DEF_domain%edgee = 85.6
 
   DEF_simulation_time%greenwich    = .TRUE.
   DEF_simulation_time%start_year    = 2015
@@ -45,6 +45,9 @@
   ! PRINCETON | GSWP3   | QIAN  | CRUNCEPV4 | CRUNCEPV7 | ERA5LAND | ERA5  | MSWX
   ! WFDE5     | CRUJRA  | WFDEI | JRA55     | GDAS      | CMFD     | POINT | JRA3Q
   DEF_forcing_namelist = '/tera05/lilu/CoLM/CoLM-DA/run/forcing/ERA5.nml'
+
+  DEF_DA_SMAP = .true.
+  DEF_DA_GRACE = .false.
 
   ! ----- history -----
   DEF_hist_grid_as_forcing = .true.

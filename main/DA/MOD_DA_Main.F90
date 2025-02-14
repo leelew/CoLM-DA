@@ -2,46 +2,88 @@
 
 #ifdef DataAssimilation
 MODULE MOD_DA_Main
-
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!     Main procedures for data assimilation
+! 
+! AUTHOR:
+!     Lu Li, 12/2024
+!-----------------------------------------------------------------------------
    USE MOD_Precision
-   !USE MOD_DA_GRACE
+   USE MOD_Namelist
+   USE MOD_DA_GRACE
    USE MOD_DA_SMAP
    IMPLICIT NONE
+   SAVE
+
+
+!-----------------------------------------------------------------------------
 
 CONTAINS
 
-   ! ----------
-   SUBROUTINE init_DataAssimilation ()
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE init_DA ()
       
+!-----------------------------------------------------------------------------
    IMPLICIT NONE
       
-      !CALL init_DA_GRACE ()
-      CALL allocate_SMAP  ()
+      IF (DEF_DA_GRACE) THEN
+         CALL init_DA_GRACE ()
+      ENDIF
 
-   END SUBROUTINE init_DataAssimilation
+      IF (DEF_DA_SMAP) THEN
+         CALL init_DA_SMAP  ()
+      ENDIF
 
-   ! ----------
-   SUBROUTINE do_DataAssimilation (idate, deltim)
+   END SUBROUTINE init_DA
+
+
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE run_DA (idate, deltim)
       
+!-----------------------------------------------------------------------------
    IMPLICIT NONE
+
+!---------------------Dummy arguments-----------------------------------------
    integer,  intent(in) :: idate(3)
    real(r8), intent(in) :: deltim   
 
-      !CALL do_DA_GRACE (idate, deltim)
-      CALL run_DA_SMAP  (idate, deltim)
+!-----------------------------------------------------------------------------
+
+      IF (DEF_DA_GRACE) THEN
+         CALL run_DA_GRACE (idate, deltim)
+      ENDIF
+
+      IF (DEF_DA_SMAP) THEN
+         CALL run_DA_SMAP  (idate, deltim)
+      ENDIF
       
+   END SUBROUTINE run_DA
 
-   END SUBROUTINE do_DataAssimilation
 
-   ! ---------
-   SUBROUTINE final_DataAssimilation ()
 
+!-----------------------------------------------------------------------------
+   
+   SUBROUTINE end_DA ()
+
+!-----------------------------------------------------------------------------
    IMPLICIT NONE
 
-      !CALL final_DA_GRACE ()
-      CALL deallocate_SMAP  ()
+      IF (DEF_DA_GRACE) THEN
+         CALL end_DA_GRACE ()
+      ENDIF
 
-   END SUBROUTINE final_DataAssimilation
+      IF (DEF_DA_SMAP) THEN
+         CALL end_DA_SMAP  ()
+      ENDIF
 
+   END SUBROUTINE end_DA
+
+
+
+!-----------------------------------------------------------------------------
 END MODULE MOD_DA_Main
 #endif

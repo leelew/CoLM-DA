@@ -2,18 +2,28 @@
 
 #ifdef DataAssimilation
 MODULE MOD_DA_Ensemble
+!-----------------------------------------------------------------------
+! DESCRIPTION:
+!    Provide functions to generate ensemble samples for data assimilation
+! 
+! REFERENCES:
+!    [1] SMOS brightness temperature assimilation into the Community Land Model
+!        Hydrol. Earth Syst. Sci., 21, 5929–5951, 2017, 
+!        https://doi.org/10.5194/hess-21-5929-2017
+! AUTHOR:
+! Lu Li, 12/2024: Initial version
+!-----------------------------------------------------------------------
     USE MOD_Vars_Global
     USE MOD_Precision
     IMPLICIT NONE
-    
+
+! public functions
     PUBLIC :: disturb_forc_ens
 
     PRIVATE
 
-    ! disturbance standard deviation
-    ! SMOS brightness temperature assimilation into the Community Land Model
-    !     Hydrol. Earth Syst. Sci., 21, 5929–5951, 2017, 
-    !     https://doi.org/10.5194/hess-21-5929-2017
+! local parameters
+    ! disturbance standard deviation from [1]
     real(r8) :: std_sr = 0.3 ! multiplicative noise
     real(r8) :: std_ta = 2.5 ! additive noise
     real(r8) :: std_p  = 0.3 ! multiplicative noise, log-normal noise
@@ -132,5 +142,7 @@ CONTAINS
         
     END SUBROUTINE disturb_forc_ens
 
+
+!-----------------------------------------------------------------------
 END MODULE MOD_DA_Ensemble
 #endif

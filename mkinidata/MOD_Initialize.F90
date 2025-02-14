@@ -1458,9 +1458,8 @@ CONTAINS
 #endif
 
 #ifdef DataAssimilation
+      ! initialize the ensemble variableså
       IF (p_is_worker) THEN
-
-         ! initialize the ensemble variables
          DO i = 1, num_ens
             z_sno_ens(:,i,:) = z_sno
             dz_sno_ens(:,i,:) = dz_sno

@@ -116,8 +116,6 @@ MODULE MOD_Namelist
    character(len=256) :: DEF_dir_restart  = 'path/to/restart'
    character(len=256) :: DEF_dir_history  = 'path/to/history'
 
-   character(len=256) :: DEF_DA_obsdir    = 'null'
-
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ! ----- Part 6: make surface data -----
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -432,6 +430,13 @@ MODULE MOD_Namelist
    character(len=256):: DEF_DS_HiresTopographyDataDir      = 'null'
    character(len=5)  :: DEF_DS_precipitation_adjust_scheme = 'I'
    character(len=5)  :: DEF_DS_longwave_adjust_scheme      = 'II'
+
+! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+! ----- Part 11: data assimilation -----
+! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   character(len=256) :: DEF_DA_obsdir  = 'null'
+   logical            :: DEF_DA_GRACE   = .false.
+   logical            :: DEF_DA_SMAP    = .false.
 
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ! ----- Part 13: history and restart -----
@@ -1012,6 +1017,8 @@ CONTAINS
       DEF_ElementNeighbour_file,              &
 
       DEF_DA_obsdir,                          &
+      DEF_DA_GRACE,                           &
+      DEF_DA_SMAP,                            &
 
       DEF_forcing_namelist,                   &
 
@@ -1587,6 +1594,10 @@ CONTAINS
       CALL mpi_bcast (DEF_forcing%CBL_tintalgo               ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_forcing%CBL_dtime                  ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_forcing%CBL_offset                 ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
+
+      CALL mpi_bcast (DEF_DA_GRACE                           ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_SMAP                            ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
+
 #endif
 
       CALL sync_hist_vars (set_defaults = .true.)

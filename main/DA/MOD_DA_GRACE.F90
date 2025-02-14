@@ -9,8 +9,8 @@ MODULE MOD_DA_GRACE
    IMPLICIT NONE
 
    PUBLIC :: init_DA_GRACE
-   PUBLIC :: do_DA_GRACE
-   PUBLIC :: final_DA_GRACE 
+   PUBLIC :: run_DA_GRACE
+   PUBLIC :: end_DA_GRACE 
    
    real(r8), allocatable, PUBLIC :: fslp_k_mon (:,:) ! slope factor of runoff
    real(r8), allocatable, PUBLIC :: fslp_k (:) ! slope factor of runoff
@@ -165,7 +165,7 @@ CONTAINS
    END SUBROUTINE init_DA_GRACE 
 
    ! ----------
-   SUBROUTINE do_DA_GRACE (idate, deltim)
+   SUBROUTINE run_DA_GRACE (idate, deltim)
       
    USE MOD_Spmd_task
    USE MOD_TimeManager
@@ -367,10 +367,10 @@ CONTAINS
       ENDIF
 
 
-   END SUBROUTINE do_DA_GRACE
+   END SUBROUTINE run_DA_GRACE
 
    ! ---------
-   SUBROUTINE final_DA_GRACE ()
+   SUBROUTINE end_DA_GRACE ()
 
    IMPLICIT NONE
 
@@ -393,7 +393,7 @@ CONTAINS
       IF (allocated(longrace)) deallocate(longrace)
       IF (allocated(latgrace)) deallocate(latgrace)
 
-   END SUBROUTINE final_DA_GRACE 
+   END SUBROUTINE end_DA_GRACE 
 
    ! ---------
    SUBROUTINE retrieve_yymm_from_days (days, yy, mm)

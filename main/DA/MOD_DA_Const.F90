@@ -52,7 +52,7 @@ MODULE MOD_DA_Const
     complex(r8), parameter :: jj = (0., 1.)         ! imaginary unit for complex number
 
     
-! TODO (Lu Li): support other land cover classification system
+!//TODO (Lu Li): support other land cover classification system
 #ifdef LULC_IGBP 
 
     ! MODIS IGBP Land Use/Land Cover System Legend
@@ -146,4 +146,5 @@ MODULE MOD_DA_Const
 #endif
 
 END MODULE MOD_DA_Const
+!-----------------------------------------------------------------------------
 #endif

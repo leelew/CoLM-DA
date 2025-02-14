@@ -1,10 +1,9 @@
 #include <define.h>
+
 #ifdef DataAssimilation
-
-
-! -----------------------------------------------------------------
 MODULE MOD_DA_Vars_TimeVariables
-   !//TODO: Lu Li: Only support default vars and IGBP
+   !//TODO: Lu Li: Only support default vars and IGBP now, need 
+   !               to extend to support other land cover types
 
    USE MOD_Precision
    USE MOD_TimeManager
@@ -128,21 +127,17 @@ CONTAINS
 !-----------------------------------------------------------------------
 
    SUBROUTINE allocate_TimeVariables_ens
-! --------------------------------------------------------------------
-! Allocates memory for CoLM 1d [numpatch] variables for ensemble
-! --------------------------------------------------------------------
 
+!-----------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Vars_Global
    USE MOD_SPMD_Task
    USE MOD_LandPatch, only: numpatch
    IMPLICIT NONE
 
-
+!-----------------------------------------------------------------------
       IF (p_is_worker) THEN
-
          IF (numpatch > 0) THEN
-
             allocate (z_sno_ens      (maxsnl+1:0,      num_ens,numpatch)); z_sno_ens       (:,:,:) = spval
             allocate (dz_sno_ens     (maxsnl+1:0,      num_ens,numpatch)); dz_sno_ens      (:,:,:) = spval
             allocate (t_soisno_ens   (maxsnl+1:nl_soil,num_ens,numpatch)); t_soisno_ens    (:,:,:) = spval
@@ -240,28 +235,25 @@ CONTAINS
             
             allocate (lb_ens                         (num_ens, numpatch)); lb_ens              (:,:) = spval_i4
             allocate (dz_soisno_ens  (maxsnl+1:nl_soil,num_ens,numpatch)); dz_soisno_ens     (:,:,:) = spval
-            
          ENDIF
       ENDIF
 
    END SUBROUTINE allocate_TimeVariables_ens
 
 
+
 !-----------------------------------------------------------------------
+
    SUBROUTINE deallocate_TimeVariables_ens ()
 
+!-----------------------------------------------------------------------
    USE MOD_SPMD_Task
    USE MOD_LandPatch, only: numpatch
    IMPLICIT NONE
 
-      ! --------------------------------------------------
-      ! Deallocates memory for CoLM 1d [numpatch] variables
-      ! --------------------------------------------------
-
+!-----------------------------------------------------------------------
       IF (p_is_worker) THEN
-
          IF (numpatch > 0) THEN
-
             deallocate (z_sno_ens                  )
             deallocate (dz_sno_ens                 )
             deallocate (t_soisno_ens               )
@@ -357,18 +349,21 @@ CONTAINS
             deallocate (fh_ens                     )
             deallocate (fq_ens                     )
             
-            deallocate (lb_ens)
+            deallocate (lb_ens                     )
             deallocate (dz_soisno_ens              )
-
          ENDIF
       ENDIF
 
    END SUBROUTINE deallocate_TimeVariables_ens
 
 
+
+
 !-----------------------------------------------------------------------
+
    SUBROUTINE WRITE_TimeVariables_ens (idate, lc_year, site, dir_restart)
 
+!-----------------------------------------------------------------------
    USE MOD_SPMD_Task
    USE MOD_Namelist, only : DEF_REST_CompressLevel, DEF_USE_PLANTHYDRAULICS, DEF_USE_OZONESTRESS, &
                             DEF_USE_IRRIGATION, DEF_USE_Dynamic_Lake
@@ -378,11 +373,13 @@ CONTAINS
    USE MOD_Vars_TimeInvariants, only : dz_lake
    IMPLICIT NONE
 
+!-----------------------------------------------------------------------
    integer, intent(in) :: idate(3)
    integer, intent(in) :: lc_year      !year of land cover type data
    character(len=*), intent(in) :: site
    character(len=*), intent(in) :: dir_restart
 
+!-----------------------------------------------------------------------
    ! Local variables
    character(len=256) :: file_restart
    character(len=14)  :: cdate
@@ -390,6 +387,7 @@ CONTAINS
    integer :: compress
    integer :: i
 
+!-----------------------------------------------------------------------
       compress = DEF_REST_CompressLevel
 
       ! land cover type year
@@ -509,16 +507,15 @@ ENDIF
       CALL ncio_write_vector (file_restart, 'fh   ', 'ens', num_ens, 'patch', landpatch, fh_ens,   compress) ! integral of profile FUNCTION for heat
       CALL ncio_write_vector (file_restart, 'fq   ', 'ens', num_ens, 'patch', landpatch, fq_ens,   compress) ! integral of profile FUNCTION for moisture
       
-      !CALL ncio_write_vector (file_restart, 'lb', 'ens', num_ens, 'patch', landpatch,  lb_ens, compress)
-      !CALL ncio_write_vector (file_restart, 'dz_soisno', 'soilsnow', nl_soil-maxsnl, 'ens', num_ens, 'patch', landpatch, dz_soisno_ens, compress)
-
    END SUBROUTINE WRITE_TimeVariables_ens
 
 
 
 !-----------------------------------------------------------------------
+
    SUBROUTINE READ_TimeVariables_ens (idate, lc_year, site, dir_restart)
 
+!-----------------------------------------------------------------------
    USE MOD_Namelist
    USE MOD_SPMD_Task
    USE MOD_NetCDFVector
@@ -528,18 +525,19 @@ ENDIF
    USE MOD_LandPatch
    USE MOD_Vars_Global
    USE MOD_Vars_TimeInvariants, only : dz_lake
-
    IMPLICIT NONE
 
+!-----------------------------------------------------------------------
    integer, intent(in) :: idate(3)
    integer, intent(in) :: lc_year      !year of land cover type data
    character(len=*), intent(in) :: site
    character(len=*), intent(in) :: dir_restart
 
-   ! Local variables
+!-----------------------------------------------------------------------
    character(len=256) :: file_restart
    character(len=14)  :: cdate, cyear
 
+!-----------------------------------------------------------------------
 #ifdef USEMPI
       CALL mpi_barrier (p_comm_glb, p_err)
 #endif
@@ -639,9 +637,6 @@ ENDIF
       CALL ncio_read_vector (file_restart, 'fm   ', num_ens, landpatch, fm_ens) ! integral of profile FUNCTION for momentum
       CALL ncio_read_vector (file_restart, 'fh   ', num_ens, landpatch, fh_ens) ! integral of profile FUNCTION for heat
       CALL ncio_read_vector (file_restart, 'fq   ', num_ens, landpatch, fq_ens) ! integral of profile FUNCTION for moisture
-      
-      !CALL ncio_read_vector (file_restart, 'lb              ' , num_ens, landpatch, lb_ens)
-      !CALL ncio_read_vector (file_restart, 'dz_soisno       ' , nl_soil-maxsnl, num_ens, landpatch, dz_soisno_ens)
 
 #ifdef RangeCheck
       CALL check_TimeVariables_ens
@@ -655,18 +650,20 @@ ENDIF
 
 
 
-!-----------------------------------------------------------------------
 #ifdef RangeCheck
+!-----------------------------------------------------------------------
+
    SUBROUTINE check_TimeVariables_ens ()
 
+!-----------------------------------------------------------------------
    USE MOD_SPMD_Task
    USE MOD_RangeCheck
    USE MOD_Namelist, only: DEF_USE_PLANTHYDRAULICS, DEF_USE_OZONESTRESS, DEF_USE_IRRIGATION, &
                            DEF_USE_SNICAR, DEF_USE_Dynamic_Lake
    USE MOD_Vars_TimeInvariants, only : dz_lake
-
    IMPLICIT NONE
 
+!-----------------------------------------------------------------------
 #ifdef USEMPI
       CALL mpi_barrier (p_comm_glb, p_err)
 #endif
@@ -689,9 +686,9 @@ IF (DEF_USE_PLANTHYDRAULICS) THEN
 ENDIF
 
 IF (DEF_USE_OZONESTRESS) THEN
-      CALL check_vector_data ('lai_old     ', lai_old_ens    )
-      CALL check_vector_data ('o3uptakesun ', o3uptakesun_ens)
-      CALL check_vector_data ('o3uptakesha ', o3uptakesha_ens)
+      CALL check_vector_data ('lai_old     []     ', lai_old_ens    )
+      CALL check_vector_data ('o3uptakesun []     ', o3uptakesun_ens)
+      CALL check_vector_data ('o3uptakesha []     ', o3uptakesha_ens)
 ENDIF
 
       CALL check_vector_data ('t_grnd      [K]    ', t_grnd_ens     ) ! ground surface temperature [K]
@@ -734,7 +731,7 @@ ENDIF
       CALL check_vector_data ('savedtke1   [W/m K]', savedtke1_ens   ) ! saved tke1 [m2/s2]
       
 IF (DEF_USE_SNICAR) THEN
-      CALL check_vector_data ('snw_rds     [m-6]  ',  snw_rds_ens )
+      CALL check_vector_data ('snw_rds     [m-6]  ',  snw_rds_ens   )
       CALL check_vector_data ('mss_bcpho   [Kg]   ',  mss_bcpho_ens )
       CALL check_vector_data ('mss_bcphi   [Kg]   ',  mss_bcphi_ens )
       CALL check_vector_data ('mss_ocpho   [Kg]   ',  mss_ocpho_ens )
