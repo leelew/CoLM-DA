@@ -7,7 +7,8 @@ MODULE MOD_DA_EnKF
 !    ensemble Kalman filter (EnKF) 
 ! 
 ! AUTHOR:
-! Lu Li, 12/2024: Initial version
+!   Lu Li, 12/2024: Initial version
+!   Zhilong Fan, Lu Li, 03/2024: Debug and clean codes
 !-----------------------------------------------------------------------
     USE MOD_Precision
     IMPLICIT NONE
@@ -99,12 +100,13 @@ CONTAINS
         ENDDO
 
         ! calculate C*dHA, intermediate matrix in background error M1 
-        CALL dgemm('N', 'N', num_ens, num_ens, num_obs, 1.0d0, C, num_ens, dHA, num_ens, 0.0d0, M1, num_ens) !(kxk)
+        CALL dgemm('N', 'N', num_ens, num_ens, num_obs, 1.0_8, C, num_ens, dHA, num_obs, 0.0_8, M1, num_ens) 
 
-        ! calculate inverse of background error 
-        DO i = 1, num_ens
-            pa_inv(i,i) = M1(i,i) + (num_ens-1)*1.0d0/infl !(kxk)
-        ENDDO
+        ! calculate inverse of background error
+        pa_inv = M1         
+        do i=1, num_ens     
+            pa_inv(i,i) = M1(i,i) + (num_ens-1)*1.0d0/infl               
+        end do
 
         ! eigenvalues and eigenvectors of inverse of background error
         lwork = 4 * num_ens
@@ -116,24 +118,24 @@ CONTAINS
         DO i = 1, num_ens
             M2(:,i) = eigvec(:,i) / eigval(i) !(kxk)
         ENDDO
-        CALL dgemm('N', 'T', num_ens, num_ens, num_obs, 1.0d0, M2, num_ens, eigvec, num_ens, 0.0d0, pa, num_ens) !(kxk)
+        CALL dgemm('N', 'T', num_ens, num_ens, num_ens, 1.0_8, M2, num_ens, eigvec, num_ens, 0.0_8, pa, num_ens) !(kxk)
 
         ! caculate pa * C, intermediate matrix in Kalman gain M3
-        CALL dgemm('N', 'N', num_ens, num_obs, num_ens, 1.0d0, pa, num_ens, C, num_ens, 0.0d0, M3, num_ens) !(kxl)
+        CALL dgemm('N', 'N', num_ens, num_obs, num_ens, 1.0_8, pa, num_ens, C, num_ens, 0.0_8, M3, num_ens) !(kxl)
 
         ! calculate weight
         delta = y - HA_mean
-        CALL dgemm('N', 'N', num_ens, 1, num_obs, 1.0d0, M3, num_ens, delta, num_obs, 0.0d0, w_avg, num_ens) !(kx1)
+        CALL dgemm('N', 'N', num_ens, 1, num_obs, 1.0_8, M3, num_ens, delta, num_obs, 0.0_8, w_avg, num_ens) !(kx1)
         
         ! calculate mean of analysis ensemble 
-        CALL dgemm('N', 'N', num_state, 1, num_ens, 1.0d0, dA, num_state, w_avg, num_ens, 0.0d0, A_pert, num_state) !(mx1)
+        CALL dgemm('N', 'N', num_state, 1, num_ens, 1.0_8, dA, num_state, w_avg, num_ens, 0.0_8, A_pert, num_state) !(mx1)
         A_analysis_mean = A_mean + A_pert !(mx1)
 
         ! calculate pertubation transform matrix 
         DO j = 1, num_ens
             M4(:,j) = eigvec(:,j) * sqrt((num_ens-1) / eigval(j))  !(kxk)
         ENDDO
-        CALL dgemm('N', 'T', num_ens, num_ens, num_ens, 1.0d0, M4, num_ens, eigvec, num_ens, 0.0d0, trans_pert, num_ens) !(kxk)
+        CALL dgemm('N', 'T', num_ens, num_ens, num_ens, 1.0_8, M4, num_ens, eigvec, num_ens, 0.0_8, trans_pert, num_ens) !(kxk)
 
         ! calculate transform matrix
         DO j = 1, num_ens
@@ -141,7 +143,7 @@ CONTAINS
         ENDDO
 
         ! caclulate analysis ensemble
-        CALL dgemm('N', 'N', num_state, num_ens, num_ens, 1.0d0, dA, num_state, trans, num_ens, 0.0d0, M5, num_state) !(mxk)
+        CALL dgemm('N', 'N', num_state, num_ens, num_ens, 1.0_8, dA, num_state, trans, num_ens, 0.0_8, M5, num_state) !(mxk)
         DO j = 1, num_ens
             A_analysis_ens(:,j) = A_mean(j) + M5(:,j) !(mxk)
         ENDDO

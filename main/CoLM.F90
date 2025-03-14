@@ -460,6 +460,10 @@ PROGRAM CoLM
          ! ----------------------------------------------------------------------
          CALL hist_out (idate, deltim, itstamp, etstamp, ptstamp, dir_hist, casename)
 
+#ifdef DataAssimilation
+         call deallocate_DA_hist (idate, deltim, itstamp, etstamp)  
+#endif
+
          CALL CheckEquilibrium (idate, deltim, itstamp, dir_hist, casename)
 
          ! DO land USE and land cover change simulation

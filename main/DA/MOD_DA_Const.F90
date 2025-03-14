@@ -22,10 +22,13 @@ MODULE MOD_DA_Const
 !   [3] Wang, S.; Wigneron, J.-P.; Jiang, L.M.; Parrens, M. Global-scale evaluation of roughness 
 !       effects on C-Band AMSR-E observations. Remote Sens. 2015, 7, 5734–5757 doi: 10.3390/rs70505734
 !
-!   Wigneron, J. P., Jackson, T. J., O'neill, P., De Lannoy, G., de Rosnay, P., Walker, 
-!   J. P., ... & Kerr, Y. (2017). Modelling the passive microwave signature from land surfaces: 
-!   A review of recent results and application to the L-band SMOS & SMAP soil moisture retrieval algorithms. 
-!   Remote Sensing of Environment, 192, 238-262.
+!   [4] Wigneron, J. P., Jackson, T. J., O'neill, P., De Lannoy, G., de Rosnay, P., Walker, 
+!       J. P., ... & Kerr, Y. (2017). Modelling the passive microwave signature from land surfaces: 
+!       A review of recent results and application to the L-band SMOS & SMAP soil moisture retrieval algorithms. 
+!       Remote Sensing of Environment, 192, 238-262.
+!
+! AUTHOR:
+!   Lu Li, 12/2024: Initial version
 !-----------------------------------------------------------------------
 
     USE MOD_Precision
@@ -40,7 +43,7 @@ MODULE MOD_DA_Const
     real(r8),    parameter :: fghz = 1.4            ! frequency (GHz)
     real(r8),    parameter :: f = 1.4e9             ! frequency (Hz)
     real(r8),    parameter :: omega = 2*pi*f        ! radian frequency (omega = 2. * pi * f), with f in Herz
-    real(r8),    parameter :: mu0 = 4*pi*1e-7       ! vacuum permeability (H/m)
+    real(r8),    parameter :: mu0 = 4.*pi*1e-7       ! vacuum permeability (H/m)
     real(r8),    parameter :: eps0 = 8.854e-12      ! vacuum permittivity (Klein and Swift 1977) [Farads/meter]
     real(r8),    parameter :: z0 = sqrt(mu0/eps0)   ! impendace of free space (Ohm)
     real(r8),    parameter :: eps_w_inf = 4.9       ! dielectric constant at infinite frequency (Stogryn 1971),

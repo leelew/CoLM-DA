@@ -7,7 +7,8 @@ MODULE MOD_DA_ObsOperator
 !    Forward modeling of brightness temperature observations
 ! 
 ! AUTHOR:
-! Lu Li, 12/2024: Initial version
+!   Lu Li, 12/2024: Initial version
+!   Zhilong Fan, Lu Li, 03/2024: Debug and clean codes
 !-----------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_Const_Physical
@@ -16,10 +17,8 @@ MODULE MOD_DA_ObsOperator
     USE MOD_Vars_Global, only : nl_soil, nl_lake    
     IMPLICIT NONE
     SAVE
-
 ! PUBLIC MEMBER FUNCTIONS:
     PUBLIC :: forward
-
 
 !-----------------------------------------------------------------------
 
@@ -39,6 +38,12 @@ CONTAINS
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Forward modeling of brightness temperature observations
+! 
+! REFERENCES:
+!   [1] Wigneron et al., 2007, "L-band Microwave Emission of the Biosphere (L-MEB) Model:
+!       Description and calibration against experimental
+!       data sets over crop fields" Remote Sensing of Environment. Vol. 107, pp. 639-655k
+!   
 !-----------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_Const_Physical
@@ -49,27 +54,27 @@ CONTAINS
 !------------------------ Dummy Argument ------------------------------
     integer, intent(in)   :: patchtype
     integer, intent(in)   :: patchclass
-    integer, intent(in)   :: lb
-    real(r8), intent(in)  :: dz_soisno  (maxsnl+1:nl_soil)
-    real(r8), intent(in)  :: forc_topo
-    real(r8), intent(in)  :: tref
-    real(r8), intent(in)  :: tleaf
-    real(r8), intent(in)  :: t_soisno   (maxsnl+1:nl_soil)
-    real(r8), intent(in)  :: wliq_soisno(maxsnl+1:nl_soil)
-    real(r8), intent(in)  :: wice_soisno(maxsnl+1:nl_soil)
-    real(r8), intent(in)  :: h2osoi     (nl_soil)
-    real(r8), intent(in)  :: snowdp 
-    real(r8), intent(in)  :: lai
-    real(r8), intent(in)  :: sai
-    real(r8), intent(in)  :: vf_clay    (nl_soil)
-    real(r8), intent(in)  :: vf_sand    (nl_soil)
-    real(r8), intent(in)  :: BD_all     (nl_soil)
-    real(r8), intent(in)  :: porsl      (nl_soil)
-    real(r8), intent(out) :: tb_toa_h    ! brightness temperature of top-of-atmosphere for H- and V- polarization
+    integer, intent(in)   :: lb                               ! lower bound of arrays
+    real(r8), intent(in)  :: dz_soisno  (maxsnl+1:nl_soil)    ! layer thickness (m)
+    real(r8), intent(in)  :: forc_topo                        ! topography [m]
+    real(r8), intent(in)  :: tref                             ! 2 m height air temperature [kelvin]
+    real(r8), intent(in)  :: tleaf                            ! leaf temperature [K]
+    real(r8), intent(in)  :: t_soisno   (maxsnl+1:nl_soil)    ! soil temperature [K]
+    real(r8), intent(in)  :: wliq_soisno(maxsnl+1:nl_soil)    ! liquid water in layers [kg/m2]
+    real(r8), intent(in)  :: wice_soisno(maxsnl+1:nl_soil)    ! ice lens in layers [kg/m2]
+    real(r8), intent(in)  :: h2osoi     (nl_soil)             ! volumetric soil water in layers [m3/m3]
+    real(r8), intent(in)  :: snowdp                           ! snow depth [meter]
+    real(r8), intent(in)  :: lai                              ! leaf area index
+    real(r8), intent(in)  :: sai                              ! stem area index
+    real(r8), intent(in)  :: vf_clay    (nl_soil)             !volumetric fraction of clay
+    real(r8), intent(in)  :: vf_sand    (nl_soil)             !volumetric fraction of sand
+    real(r8), intent(in)  :: BD_all     (nl_soil)             !bulk density of soil (GRAVELS + ORGANIC MATTER + Mineral Soils,kg/m3)
+    real(r8), intent(in)  :: porsl      (nl_soil)             !fraction of soil that is voids [-]
+    real(r8), intent(out) :: tb_toa_h                         ! brightness temperature of top-of-atmosphere for H- and V- polarization
     real(r8), intent(out) :: tb_toa_v 
 
 !----------------------- Local Variables -------------------------------
-    logical :: is_low_veg               ! flag for low vegetation
+    logical  :: is_low_veg              ! flag for low vegetation
     real(r8) :: tau_atm                 ! atmospheric optical depth
     real(r8) :: r_r(2)                  ! rough surface reflectivity for H and V polarizations
     real(r8) :: r_sn(2)                 ! reflectivity between the snow and ground for H and V polarizations
@@ -80,8 +85,8 @@ CONTAINS
     real(r8) :: tb_tov_noad(2)          ! brightness temperature of vegetation (no downwelling radiation) for H and V polarizations
     real(r8) :: tb_au(2)                ! upwelling radiation (brightness temperature) of atmosphere
     real(r8) :: tb_ad(2)                ! downwelling radiation (brightness temperature) of atmosphere
-    real(r8) :: rho_snow                ! snow density (g/m3)
-    real(r8) :: liq_snow                ! snow liquid water content (m3/m3)
+    real(r8) :: rho_snow                ! snow density (g/cm3)
+    real(r8) :: liq_snow                ! snow liquid water content (cm3/cm3)
     real(r8) :: tb_toa(2)
 
 !----------------------------------------------------------------------- 
@@ -94,13 +99,12 @@ CONTAINS
         ! atmospheric module
         !--------------------
         CALL atm (forc_topo, tref, tau_atm, tb_au, tb_ad)
-
         !--------------------
         ! soil module
         !--------------------
         CALL soil ( &
-            patchtype, patchclass, lb, dz_soisno(lb:nl_soil), &
-            t_soisno(lb:nl_soil), h2osoi, wliq_soisno(lb:nl_soil), &
+            patchtype, patchclass, dz_soisno(1:nl_soil), &
+            t_soisno(1:nl_soil), h2osoi, wliq_soisno(1:nl_soil), &
             vf_sand, vf_clay, BD_all, porsl, &
             r_r, tb_soil)
 
@@ -116,30 +120,31 @@ CONTAINS
         IF (lai+sai>1e-6) THEN ! have vegetation
             IF (is_low_veg) THEN ! low vegetation
                 ! calculate brightness temperature of low vegetation
-                CALL veg (is_low_veg, patchclass, lai, tleaf, tb_ad, tb_soil, r_r, tb_tov, tb_tov_noad)
+                CALL veg (is_low_veg, patchclass, lai, tleaf, tb_ad, tb_au, tb_soil, r_r, tb_tov, tb_tov_noad)
 
                 ! calculate reflectivity between the snow and ground 
-                r_sn(:) = 1.0 - tb_tov_noad(:)/t_soisno(1)
+                r_sn(:) = 1.0 - tb_tov_noad(:)/t_soisno(1)    
 
-                ! calculate average snow density (g/m3)
-                rho_snow = (wliq_soisno(lb) + wice_soisno(lb)) / (dz_soisno(lb)*1000)
-                liq_snow = wliq_soisno(lb) / (dz_soisno(lb)*denh2o)
-                
+                ! calculate average snow density (g/cm3)
+                rho_snow = (wliq_soisno(lb) + wice_soisno(lb)) / (dz_soisno(lb)*1e3)        
+                liq_snow = wliq_soisno(lb) / (dz_soisno(lb)*denh2o)       !//TODO: only use property of the surface snow layer
+
                 ! calculate brightness temperature of snow-covered ground
                 CALL snow (t_soisno(lb), tleaf, snowdp, rho_snow, liq_snow, r_sn, r_snow, tb_tov)
             ELSE ! forest
                 ! calculate reflectivity between the snow and ground 
                 r_sn(:) = 1.0 - tb_soil(:)/t_soisno(1)
 
-                ! calculate average snow density (g/m3)
-                rho_snow = (wliq_soisno(lb) + wice_soisno(lb)) / (dz_soisno(lb)*1000)
+                ! calculate average snow density (g/cm3)
+                rho_snow = (wliq_soisno(lb) + wice_soisno(lb)) / (dz_soisno(lb)*1e3*1e6)
                 liq_snow = wliq_soisno(lb) / (dz_soisno(lb)*denh2o)
 
                 ! calculate brightness temperature of snow-covered ground
                 CALL snow (t_soisno(lb), t_soisno(1), snowdp, rho_snow, liq_snow, r_sn, r_snow, tb_tos)
 
                 ! calculate brightness temperature of high vegetation
-                CALL veg (is_low_veg, patchclass, lai, tleaf, tb_ad, tb_tos, r_r, tb_tov, tb_tov_noad)
+                CALL veg (is_low_veg, patchclass, lai, tleaf, tb_ad, tb_au, tb_tos, r_r, tb_tov, tb_tov_noad)
+
             ENDIF
         ELSE
             tb_tov(:) = 0.0
@@ -149,12 +154,11 @@ CONTAINS
         !--------------------
         ! Tb of top of atmosphere
         !--------------------
-        tb_toa = tb_tov * exp(-tau_atm) + tb_au
-
-        tb_toa_h = tb_toa(1)
-        tb_toa_v = tb_toa(2)
-
+        tb_toa = tb_tov * exp(-tau_atm) + tb_au     ! [1](1)
     ENDIF
+
+    tb_toa_h = tb_toa(1)   
+    tb_toa_v = tb_toa(2)
 
     END SUBROUTINE forward
 
@@ -162,15 +166,15 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE atm(z, tref, tau_atm, tb_au, tb_ad)
+    SUBROUTINE atm(z, tref, tau_atm, tb_au, tb_ad)     
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate the atmospheric opacity and up and downwelling brightness temperature
 !
 ! REFERENCES:
-!   Pellarin, T., et al. (2003), Two-year global simulation of L-band brightness
-!   temperature over land, IEEE Trans. Geosci. Remote Sens., 41, 2135–2139.  
+!   [1] Pellarin, T., et al. (2003), Two-year global simulation of L-band brightness
+!       temperature over land, IEEE Trans. Geosci. Remote Sens., 41, 2135–2139.  
 !-----------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_Const_Physical
@@ -186,20 +190,22 @@ CONTAINS
 !----------------------- Local Variables -------------------------------
     real(r8) :: t_sky = 2.7    ! cosmic ray radiation (K)
     real(r8) :: t_eq           ! equivalent layer temperature
+    real(r8) :: gossat
 
 !-----------------------------------------------------------------------
 
-        ! calculate optical depth of atmosphere
-        tau_atm = exp (-3.926 - 0.2211 * z - 0.00369 *tref)
+        ! calculate optical depth of atmosphere [1] eq(A1) 
+        tau_atm = exp (-3.9262 - 0.2211 * z/1000 - 0.00369 *tref)/cos(theta)  
+        gossat = exp(-tau_atm)
 
         ! calculate equivalent layer temperature
-        t_eq = exp( 4.927 + 0.002195 * tref)
+        t_eq = exp( 4.9274 + 0.002195 * tref)
 
         ! upwelling radiation (brightness temperature) of atmosphere
-        tb_au(:) = t_eq * (1. - exp(-tau_atm/cos(theta)))
+        tb_au(:) = t_eq * (1. - gossat)
 
-        ! downwelling radiation (brightness temperature) of atmosphere
-        tb_ad(:) = t_eq * (1. - exp(-tau_atm/cos(theta))) + t_sky * exp(-tau_atm/cos(theta))
+        ! downwelling radiation (brightness temperature) of atmosphere [1] eq(A2)
+        tb_ad(:) = t_eq * (1. - gossat) + t_sky * gossat       
 
     END SUBROUTINE atm
                             
@@ -207,12 +213,15 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE soil(patchtype, patchclass, lb, dz_soisno, t_soisno, h2osoi, wliq_soisno, vf_sand, vf_clay, BD_all, porsl, r_r, tb_soil)
+    SUBROUTINE soil(patchtype, patchclass, dz_soisno, t_soisno, h2osoi, wliq_soisno, vf_sand, vf_clay, BD_all, porsl, r_r, tb_soil)   
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate brightness temperature of soil surface
-!
+! REFERENCES:
+!   [1] Wigneron et al., 2007, "L-band Microwave Emission of the Biosphere (L-MEB) Model:
+!       Description and calibration against experimental
+!       data sets over crop fields" Remote Sensing of Environment. Vol. 107, pp. 639-655k
 !-----------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_Const_Physical
@@ -221,11 +230,10 @@ CONTAINS
 !------------------------ Dummy Argument ------------------------------
     integer, intent(in)   :: patchtype                ! land cover type
     integer, intent(in)   :: patchclass               ! land cover class
-    integer, intent(in)   :: lb                       ! land band
-    real(r8), intent(in)  :: dz_soisno  (lb:nl_soil)  ! soil layer thickness (m)
-    real(r8), intent(in)  :: t_soisno   (lb:nl_soil)  ! soil temperature (K)
-    real(r8), intent(in)  :: h2osoi     (lb:nl_soil)  ! soil water content (m3/m3)
-    real(r8), intent(in)  :: wliq_soisno(lb:nl_soil)  ! soil liquid moisture (m3/m3)
+    real(r8), intent(in)  :: dz_soisno  (1:nl_soil)   ! soil layer thickness (m)
+    real(r8), intent(in)  :: t_soisno   (1:nl_soil)   ! soil temperature (K)
+    real(r8), intent(in)  :: h2osoi     (1:nl_soil)   ! soil water content (m3/m3)
+    real(r8), intent(in)  :: wliq_soisno(1:nl_soil)   ! liquid water in layers [kg/m2]
     real(r8), intent(in)  :: vf_sand    (nl_soil)     ! sand volume fraction
     real(r8), intent(in)  :: vf_clay    (nl_soil)     ! clay volume fraction
     real(r8), intent(in)  :: BD_all     (nl_soil)     ! bulk density of soil (kg/m3)
@@ -234,16 +242,16 @@ CONTAINS
     real(r8), intent(out) :: tb_soil(2)               ! brightness temperature of soil
 
 !----------------------- Local Variables -------------------------------
-    real(r8) :: liq_h2osoi(lb:nl_soil)     ! liquid volumetric water content
-    logical :: is_desert                   ! flag for desert
-    real(r8) :: t_eff(2)                   ! effective temperature for H and V polarizations
-    complex(r8) :: eps_soil(nl_soil)       ! dielectric constant of soil for H and V polarizations
-    real(r8) :: r_s(2)                     ! smooth surface reflectivity for H and V polarizations
+    real(r8)    :: liq_h2osoi(1:nl_soil)      ! liquid volumetric water content
+    logical     :: is_desert                  ! flag for desert
+    real(r8)    :: t_eff(2)                   ! effective temperature for H and V polarizations, [K]
+    complex(r8) :: eps_soil(nl_soil)          ! dielectric constant of soil for H and V polarizations
+    real(r8)    :: r_s(2)                     ! smooth surface reflectivity for H and V polarizations
 
 !-----------------------------------------------------------------------
 
         ! liquid volumetric water content
-        liq_h2osoi = wliq_soisno(1:)/(dz_soisno(1:)*denh2o)
+        liq_h2osoi = wliq_soisno/(dz_soisno*denh2o)
 
         ! whether this patch is desert
         is_desert = .FALSE.
@@ -251,23 +259,23 @@ CONTAINS
             is_desert = .TRUE.
         ENDIF
 
-        ! caculate effective temperature
-        CALL eff_soil_temp (lb, liq_h2osoi, t_soisno, t_eff)
+        ! caculate effective temperature [1](11)(12)
+        CALL eff_soil_temp (liq_h2osoi, t_soisno, t_eff)            
 
         ! caculate soil dielectric constant
-        CALL diel_soil(is_desert, lb, t_soisno, h2osoi, liq_h2osoi, vf_sand, vf_clay, BD_all, porsl, eps_soil)
+        CALL diel_soil(is_desert, t_soisno, h2osoi, liq_h2osoi, vf_sand, vf_clay, BD_all, porsl, eps_soil)
 
-        ! caculate smooth surface reflectivity
-        CALL smooth_reflectivity(eps_soil(1), r_s)
+        ! caculate smooth surface reflectivity [1](3)
+        CALL smooth_reflectivity(eps_soil(1), r_s)                   
 
-        ! caculate rough surface reflectivity
-        CALL rough_reflectivity(is_desert, patchclass, r_s, r_r)
+        ! caculate rough surface reflectivity [1](7)
+        CALL rough_reflectivity(is_desert, patchclass, r_s, r_r)   
 
-        ! calculate brightness temperature
+        ! calculate brightness temperature [1](2)
         IF (is_desert) THEN
             CALL desert(t_eff, r_r, eps_soil(1), tb_soil)
         ELSE
-            tb_soil = t_eff * (1-r_r)
+            tb_soil = t_eff * (1-r_r)                              
         ENDIF
     
     END SUBROUTINE soil
@@ -276,19 +284,26 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE desert(t_soil, r_r, eps, tb_desert)
+    SUBROUTINE desert(t_soil, r_r, eps, tb_desert)                 
 
 !-----------------------------------------------------------------------
+! DESCRIPTION:
+!   Calculate desert emissivity using Grody and Weng, 2008 
+!
+! REFERENCES:
+!  [1] Grody, N. C., & Weng, F. (2008). Microwave emission and scattering from deserts:
+!      Theory compared with satellite measurements. 
+!      IEEE Transactions on Geoscience and Remote Sensing, 46, 361–375.
 
     USE MOD_Precision
     USE MOD_Const_Physical
     IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-    real(r8), intent(in)  :: t_soil(2)     ! desert surface temperature (K) (h-pol and v-pol)
-    real(r8), intent(in)  :: r_r(2)        ! reflectivity of rough surface  (h-pol and v-pol)
-    complex(r8), intent(in) :: eps         ! diel. const of desert 
-    real(r8), intent(out) :: tb_desert(2)  ! brightness temperature of soil for H- and V- polarization
+    real(r8), intent(in)    :: t_soil(2)     ! desert surface temperature (K) (h-pol and v-pol)
+    real(r8), intent(in)    :: r_r(2)        ! reflectivity of rough surface  (h-pol and v-pol)
+    complex(r8), intent(in) :: eps           ! diel. const of desert 
+    real(r8), intent(out)   :: tb_desert(2)  ! brightness temperature of soil for H- and V- polarization
 
 !----------------------- Local Variables -------------------------------
     real(r8) :: f0 = 0.7                      ! the fractional volume of spherical particles 
@@ -297,31 +312,31 @@ CONTAINS
                                               ! n0 : the number of particles per unit volume. 
     real(r8) :: kr = k * (0.5*1e-3)           ! size parameter 
                                               ! (kr = 2 * pi * r / lambda)
-    real(r8) :: w ! single-particle albedo
-    real(r8) :: g ! asymmetry parameter
-    real(r8) :: a ! similarity parameter
+    real(r8) :: w     ! single-particle albedo
+    real(r8) :: g     ! asymmetry parameter
+    real(r8) :: a     ! similarity parameter
     real(r8) :: em(2) ! desert soil emissivity
-    real(r8) :: y_r ! real part of y-parameters
-    real(r8) :: y_i ! imaginary part of y-parameters
+    real(r8) :: y_r   ! real part of y-parameters
+    real(r8) :: y_i   ! imaginary part of y-parameters
 
 !-----------------------------------------------------------------------
 
         ! calculate y-parameters (eq.A15)
-        y_r = (real(eps) - 1) / (real(eps) + 2)  
-        y_i = 3 * aimag(eps) / (real(eps) + 2)**2
+        y_r = (real(eps) - 1) / (real(eps) + 2)                                ! [1](A15)
+        y_i = 3 * aimag(eps) / (real(eps) + 2)**2                              ! [1](A15)
 
         ! calculate single-particle albedo (eq.A16)
         w = (1 - f0)**4 * kr**3 * y_r**2 / &
-            ((1 - f0)**4 * kr**3 * y_r**2 + 1.5 * (1 + 2*f0)**2 * y_i)
+            ((1 - f0)**4 * kr**3 * y_r**2 + 1.5 * (1 + 2*f0)**2 * y_i)         ! [1](A16)
 
         ! calculate asymmetry parameter (p.374)
-        g = 0.23 * kr**2
+        g = 0.23 * kr**2                                                       ! [1] p.374
 
         ! calculate similarity parameter (eq.3b)
-        a = sqrt((1 - w) / (1 - w * g))
+        a = sqrt((1 - w) / (1 - w * g))                                        ! [1](3b)
 
         ! calculate desert soil emissivity (eq.A13)
-        em = (1 - r_r) * (2 * a / ((1 + a) - (1 - a) * r_r))
+        em = (1 - r_r) * (2 * a / ((1 + a) - (1 - a) * r_r))                   ! [1](13)
 
         ! calculate brightness temperature of desert
         tb_desert = t_soil * em
@@ -332,16 +347,17 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE veg(is_low_veg, patchclass, lai, tleaf, tb_ad, tb_soil, r_r, tb_tov, tb_tov_noad)
+    SUBROUTINE veg(is_low_veg, patchclass, lai, tleaf, tb_ad, tb_au, tb_soil, r_r, tb_tov, tb_tov_noad)
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate the brightness temperature on the top of vegetation
 !
 ! REFERENCES:
-!    Wigneron et al., 2007, "L-band Microwave Emission of the Biosphere (L-MEB) Model:
-!    Description and calibration against experimental
-!    data sets over crop fields" Remote Sensing of Environment. Vol. 107, pp. 639-655k
+!   [1] Wigneron et al., 2007, "L-band Microwave Emission of the Biosphere (L-MEB) Model:
+!       Description and calibration against experimental
+!       data sets over crop fields" Remote Sensing of Environment. Vol. 107, pp. 639-655k
+!
 !-----------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_Const_Physical
@@ -353,6 +369,7 @@ CONTAINS
     real(r8), intent(in)  :: lai            ! leaf area index
     real(r8), intent(in)  :: tleaf          ! leaf temperature (K)
     real(r8), intent(in)  :: tb_ad(2)       ! downwelling radiation (brightness temperature) of atmosphere
+    real(r8), intent(in)  :: tb_au(2)       ! upwelling radiation (brightness temperature) of atmosphere
     real(r8), intent(in)  :: tb_soil(2)     ! brightness temperature of soil for H- and V- polarization
     real(r8), intent(in)  :: r_r(2)         ! rough surface reflectivity for H- and V- polarization
     real(r8), intent(out) :: tb_tov(2)      ! brightness temperature of vegetation for H- and V- polarization
@@ -366,20 +383,21 @@ CONTAINS
     real(r8) :: tb_2(2)      ! the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
     real(r8) :: tb_3(2)      ! upwelling soil emission attenuated by the canopy
     real(r8) :: tb_4(2)      ! the downwelling cosmic ray reflected by the soil and attenuated by the canopy layer
-    integer :: i
+    integer  :: i
+    real(r8) :: gamma_p
 
 !-----------------------------------------------------------------------
 
         ! caculate vegetation opacity (optical depth) at nadir b*VWC
         IF (is_low_veg) THEN
-            tau_nadir = b1(patchclass)*lai + b2(patchclass) ! low veg
+            tau_nadir = b1(patchclass)*lai + b2(patchclass) ! low veg                 ! [1](22)   
         ELSE
             tau_nadir = b3(patchclass) ! high veg
         ENDIF
 
         ! calculate vegetation optical depth at H- and V- polarizations
-        tau_veg(1) = tau_nadir * (cos(theta)**2 + tth(patchclass) * sin(theta)**2) 
-        tau_veg(2) = tau_nadir * (cos(theta)**2 + ttv(patchclass) * sin(theta)**2) 
+        tau_veg(1) = tau_nadir * (cos(theta)**2 + tth(patchclass) * sin(theta)**2)    ! [1](23)
+        tau_veg(2) = tau_nadir * (cos(theta)**2 + ttv(patchclass) * sin(theta)**2)    ! [1](24)
 
         ! calculate brightness temperature of vegetation
         DO i = 1, 2
@@ -387,12 +405,13 @@ CONTAINS
             !(2) the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
             !(3) upwelling soil emission attenuated by the canopy
             !(4) the downwelling cosmic ray reflected by the soil and attenuated by the canopy layer 
-            tb_1(i) = (1. - w(patchclass)) * (1. - exp(-tau_veg(i)/cos(theta))) * tleaf
-            tb_2(i) = tb_1(i) * exp(-tau_veg(i)/cos(theta)) * r_r(i)
-            tb_3(i) = tb_soil(i) * exp(-tau_veg(i)/cos(theta))  
-            tb_4(i) = tb_ad(i) * r_r(i) * exp(-2.*tau_veg(i)/cos(theta))
-            tb_tov(i) = tb_1(i) + tb_2(i) + tb_3(i) + tb_4(i)
-            tb_tov_noad(i) = tb_1(i) + tb_2(i) + tb_3(i)
+            gamma_p = exp(-tau_veg(i)/cos(theta))                         !  [1](15)
+            tb_1(i) = (1. - w(patchclass)) * (1. - gamma_p) * tleaf       !  
+            tb_2(i) = tb_1(i) * gamma_p * r_r(i)                          !  
+            tb_3(i) = tb_soil(i) * gamma_p * (1-r_r(i))                   !  
+            tb_4(i) = (tb_ad(i) - tb_au(i)) * r_r(i) * exp(-2.*tau_veg(i)/cos(theta))  !  
+            tb_tov(i) = tb_1(i) + tb_2(i) + tb_3(i) + tb_4(i)             !  
+            tb_tov_noad(i) = tb_1(i) + tb_2(i) + tb_3(i)                  !  [1](14)    
         ENDDO
 
     END SUBROUTINE veg
@@ -408,12 +427,17 @@ CONTAINS
 !   Calculate the brightness temperature of snow-covered ground
 !
 ! REFERENCES:
-!   Christian Mätzler (1987) Applications of the interaction of
-!   microwaves with the natural snow cover, Remote Sensing Reviews, 2:2, 259-387, DOI:
-!   10.1080/02757258709532086
+!   [1] Christian Mätzler (1987) Applications of the interaction of
+!       microwaves with the natural snow cover, Remote Sensing Reviews, 2:2, 259-387, DOI:
+!       10.1080/02757258709532086
 !
-!   Anderson, E. A., 1976: A point energy and mass balance model of a snow cover.
-!   NOAA Tech. Rep. NWS 19, 150 pp. U.S. Dept. of Commer., Washington, D.C.(eq.5.1)
+!   [2] Anderson, E. A., 1976: A point energy and mass balance model of a snow cover.
+!       NOAA Tech. Rep. NWS 19, 150 pp. U.S. Dept. of Commer., Washington, D.C.(eq.5.1)
+!
+!   [3] Hallikainen, M. T., F. Ulaby, and T. Deventer. 1987. Extinction behavior of dry snow in the
+!       18- to 90-GHz range. IEEE Trans. Geosci. Remote Sens., GE-25, 737–745.
+!
+!   [4] Microwave remote sensing : active and passive
 !-----------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_Const_Physical
@@ -423,14 +447,14 @@ CONTAINS
     real(r8), intent(in)  :: t_snow       ! average snow temperature (K) 
     real(r8), intent(in)  :: t            ! temperature at bottom of snow (K), i.e., soil or leaf
     real(r8), intent(in)  :: snowdp       ! snow depth (m)
-    real(r8), intent(in)  :: rho_snow     ! snow density (g/m3)
-    real(r8), intent(in)  :: liq_snow     ! snow liquid water content (m3/m3)
+    real(r8), intent(in)  :: rho_snow     ! snow density (g/cm3)                       
+    real(r8), intent(in)  :: liq_snow     ! snow liquid water content (cm3/cm3)
     real(r8), intent(in)  :: r_sn(2)      ! reflectivity between the snow and ground at (1, H-POL. 2, V.)
     real(r8), intent(out) :: r_snow(2)    ! reflectivity between the snow and air for H- and V- polarization
     real(r8), intent(out) :: tb_tos(2)    ! brightness temperature of snow-cover ground for H- and V- polarization
 
 !----------------------- Local Variables -------------------------------
-    real(r8) :: sal_snow = 0.0                   ! snow salinity (psu)
+    real(r8) :: sal_snow = 0.0                   ! snow salinity (pmm)
     real(r8) :: eps_i_r                          ! real part of dielectric constant of ice
     real(r8) :: eps_i_i                          ! imaginary part of dielectric constant of ice
     real(r8) :: eps_i_is                         ! imaginary part of dielectric constant of impure ice -5(C)
@@ -447,13 +471,13 @@ CONTAINS
     complex(r8) :: eps_b
     complex(r8) :: eps_c                         ! dielectric constant of three parts
     complex(r8) :: eps                           ! dielectric constant of wet snow
-    real(r8) :: rho_ds                           ! density of dry snow
+    real(r8) :: rho_ds                           ! density of dry snow  (g/cm3)
     real(r8) :: rho_i = 0.917                    ! density of ice (g/cm3)
     real(r8) :: aa = 0.005
     real(r8) :: bb = 0.4975
     real(r8) :: cc = 0.4975                      ! fitting parameters
     real(r8) :: fa, fb, fc                       ! relaxation frequency of wet snow
-    real(r8) :: d                                ! snow grain size (m)
+    real(r8) :: d                                ! snow grain size (mm)
     real(r8) :: alpha, beta, pp, qq              ! parameter used to calculate propogation angle in snow
     real(r8) :: theta_s                          ! propogation angle in snow
     complex(r8) :: z_s                           ! wave impedance in snow
@@ -462,13 +486,13 @@ CONTAINS
     real(r8) :: tb_3                             ! the net apparent temperature contributions due to emission by layers 3 (soil)
     real(r8) :: l2                               ! extinction coefficient of snow (Beer's Law)
     real(r8) :: q = 0.96                         ! parameter
-    real(r8) :: ka_ws                            ! absorption coefficient of wet snow
-    real(r8) :: ka_ds                            ! absorption coefficient of dry snow
-    real(r8) :: ke                               ! extinction coefficient of wet snow 
-    real(r8) :: ke_ds                            ! extinction coefficient of dry snow
-    real(r8) :: ks                               ! scattering coefficient of snow 
+    real(r8) :: ka_ws                            ! absorption coefficient of wet snow      
+    real(r8) :: ka_ds                            ! absorption coefficient of dry snow      
+    real(r8) :: ke                               ! extinction coefficient of wet snow      
+    real(r8) :: ke_ds                            ! extinction coefficient of dry snow      
+    real(r8) :: ks                               ! scattering coefficient of snow          
     real(r8) :: b_ds, b_ws
-    integer :: i
+    integer  :: i
 
 !-----------------------------------------------------------------------
 
@@ -476,121 +500,124 @@ CONTAINS
             ! calculate dielectric constant of ice
             CALL diel_ice (t_snow - tfrz, eps_i)
             eps_i_r = real(eps_i)
-            eps_i_i = aimag(eps_i)
+            eps_i_i = -1*aimag(eps_i)                
 
             ! consider the effect of salinity on the dielectric constant of ice
-            eps_i_is = 0.0026/fghz + 0.00023 * (fghz**0.87) ! impure ice -5(C)
-            eps_i_ip = 6.e-4/fghz + 6.5e-5 * (fghz**1.07) ! pure ice -5(C)
-            eps_i_i = eps_i_i + (eps_i_is - eps_i_ip) * sal_snow / 13 ! corrected diel cons of ice
+            eps_i_is = 0.0026/fghz + 0.00023 * (fghz**0.87) ! impure ice -5(C)                        
+            eps_i_ip = 6.e-4/fghz + 6.5e-5 * (fghz**1.07)   ! pure ice -5(C)                          
+            eps_i_i = eps_i_i + (eps_i_is - eps_i_ip) * sal_snow / 13 ! corrected diel cons of ice    
 
             ! calculate dielectric constant of dry snow (mixed by air and ice) 
             ! (Polder–van Santen mixing model)
-            rho_ds = (rho_snow - liq_snow)/(1.0 - liq_snow)   ! caculate density of dry snow
-            eps_ds_r = 1.0 + 1.58 * rho_ds / (1.0 - 0.365 * rho_ds) 
-            eps_ds_i = 3.0 * (rho_ds/rho_i) * eps_i_i * (eps_ds_r**2)*(2*eps_ds_r+1) / &
+            rho_ds = (rho_snow - liq_snow)/(1.0 - liq_snow)   ! caculate density of dry snow,
+            eps_ds_r = 1.0 + 1.58 * rho_ds / (1.0 - 0.365 * rho_ds)                                   
+            eps_ds_i = 3.0 * (rho_ds/rho_i) * eps_i_i * (eps_ds_r**2)*(2*eps_ds_r+1) / &             
                 ((eps_i_r+2*eps_ds_r)*(eps_i_r+2*eps_ds_r**2))
 
             ! calculate dielectric constant of wet snow (Matzler 1987)
             IF (liq_snow > 0.) THEN  ! wet snow
-                ! caculate relaxation frequency of three parts (eq.2.26)
-                fa = f0w * (1 + (aa * (eps_w_s - eps_w_inf)/(1 + (aa * (eps_w_inf - eps_ds_r)))))
-                fb = f0w * (1 + (bb * (eps_w_s - eps_w_inf)/(1 + (bb * (eps_w_inf - eps_ds_r)))))
-                fc = f0w * (1 + (cc * (eps_w_s - eps_w_inf)/(1 + (cc * (eps_w_inf - eps_ds_r)))))
+                ! caculate relaxation frequency of three parts (eq.2.26) 
+                !//TODO: the calculation of f is wrong in CMEM
+                fa = f0w * (1 + (aa * (eps_w_s - eps_w_inf)/(eps_ds_r + (aa * (eps_w_inf - eps_ds_r)))))
+                fb = f0w * (1 + (bb * (eps_w_s - eps_w_inf)/(eps_ds_r + (bb * (eps_w_inf - eps_ds_r)))))
+                fc = f0w * (1 + (cc * (eps_w_s - eps_w_inf)/(eps_ds_r + (cc * (eps_w_inf - eps_ds_r)))))
 
                 ! caculate infinite frequency dielectric constant of three parts
-                eps_a_inf = (liq_snow * (eps_w_inf - eps_ds_r) / 3) / & 
+                eps_a_inf = (liq_snow * (eps_w_inf - eps_ds_r) / 3) / &                               
                     (1. + aa * ((eps_w_inf/eps_ds_r) -1.))
-                eps_b_inf = (liq_snow * (eps_w_inf - eps_ds_r) / 3) / & 
+                eps_b_inf = (liq_snow * (eps_w_inf - eps_ds_r) / 3) / &                               
                     (1. + bb * ((eps_w_inf/eps_ds_r) -1.))
-                eps_c_inf = (liq_snow * (eps_w_inf - eps_ds_r) / 3) / & 
+                eps_c_inf = (liq_snow * (eps_w_inf - eps_ds_r) / 3) / &                              
                     (1. + cc * ((eps_w_inf/eps_ds_r) -1.))
 
                 ! caculate static dielectric constant of three parts
-                eps_a_s = (liq_snow/3.) * (eps_w_s - eps_ds_r) / & 
+                eps_a_s = (liq_snow/3.) * (eps_w_s - eps_ds_r) / &                                   
                     (1. + aa * ((eps_w_s/eps_ds_r) -1.))
-                eps_b_s = (liq_snow/3.) * (eps_w_s - eps_ds_r) / & 
+                eps_b_s = (liq_snow/3.) * (eps_w_s - eps_ds_r) / &                                    
                     (1. + bb * ((eps_w_s/eps_ds_r) -1.))
-                eps_c_s = (liq_snow/3.) * (eps_w_s - eps_ds_r) / & 
+                eps_c_s = (liq_snow/3.) * (eps_w_s - eps_ds_r) / &                                   
                     (1. + cc * ((eps_w_s/eps_ds_r) -1.))
 
                 ! Debye equations 
-                eps_a = eps_a_inf + (eps_a_s - eps_a_inf) / (1 + jj * fghz / fa)
-                eps_b = eps_b_inf + (eps_b_s - eps_b_inf) / (1 + jj * fghz / fb)
-                eps_c = eps_c_inf + (eps_c_s - eps_c_inf) / (1 + jj * fghz / fc)
+                eps_a = eps_a_inf + (eps_a_s - eps_a_inf) / (1 + jj * fghz / fa)                      
+                eps_b = eps_b_inf + (eps_b_s - eps_b_inf) / (1 + jj * fghz / fb)                      
+                eps_c = eps_c_inf + (eps_c_s - eps_c_inf) / (1 + jj * fghz / fc)                      
 
                 ! calculate dielectric constant of wet snow
-                eps = eps_a + eps_b + eps_c + (eps_ds_r - jj * eps_ds_i)
-                eps_ws_r = real(eps)
-                eps_ws_i = aimag(eps)
+                eps = eps_a + eps_b + eps_c + (eps_ds_r - jj * eps_ds_i)                          
+                eps_ws_r = real(eps)                                                               
+                eps_ws_i = -1*aimag(eps)                                                              
             ELSE
                 eps_ws_r = eps_ds_r
                 eps_ws_i = eps_ds_i
             ENDIF
 
-            ! caculate propogation angle in snow (change medium from air to snow)
-            alpha = k * abs(aimag(sqrt(eps_ws_r - jj * eps_ws_i))) 
-            beta = k * real(sqrt(eps_ws_r - jj * eps_ws_i))
-            pp = 2 * alpha * beta
-            qq = beta**2 - alpha**2 - (k*k) * (sin(theta)**2)
-            theta_s = atan(k * sin(theta) / ((1./sqrt(2.)) &
+            ! caculate propogation angle in snow (change medium from air to snow)     
+            alpha = k * abs(aimag(sqrt(eps_ws_r - jj * eps_ws_i)))           
+            beta = k * real(sqrt(eps_ws_r - jj * eps_ws_i))                  
+            pp = 2 * alpha * beta                                            
+            qq = beta**2 - alpha**2 - (k*k) * (sin(theta)**2)               
+            theta_s = atan(k * sin(theta) / ((1./sqrt(2.)) &                 
                 * sqrt(sqrt(pp**2 + qq**2) + qq)))
 
             ! caclulate wave impedance in snow
-            z_s = mu0 / (eps_ws_r - jj * eps_ws_i)
+            z_s = z0 / (eps_ws_r - jj * eps_ws_i)              
 
             ! calculate brightness temperature above snow for H- V- polarization
             DO i = 1, 2
                 ! Fresnel reflection coefficient between snow and air
                 IF (i == 1) THEN
-                    r_sa = abs((z_s*cos(theta) - mu0*cos(theta_s)) / &
-                    (z_s*cos(theta) + mu0*cos(theta_s)))**2
+                    r_sa = abs((z_s*cos(theta) - z0*cos(theta_s)) / &
+                    (z_s*cos(theta) + z0*cos(theta_s)))**2        
                 ELSE
-                    r_sa = abs((mu0*cos(theta) - z_s*cos(theta_s)) / &
-                    (mu0*cos(theta) + z_s*cos(theta_s)))**2
+                    r_sa = abs((z0*cos(theta) - z_s*cos(theta_s)) / &
+                    (z0*cos(theta) + z_s*cos(theta_s)))**2     
                 ENDIF
 
-                ! calculate snow grain size (m) (Anderson 1976, eq.5.1)
-                d = min(1000*(1.6e-4 + 1.1e-13*((rho_snow*1000.0)**4)), 3.0)
+                ! calculate snow grain size (mm) (Anderson 1976, eq.5.1)
+                d = min(1000*(1.6e-4 + 1.1e-13*((rho_snow*1000.0)**4)), 3.0)      
 
                 ! extinction coefficient of dry snow
-                ke_ds = 0.0018 * (fghz**2.8) * (d**2) / 4.3429
+                !//TODO: the paper is not focus on L-band, thus the formula is not suitable
+                ke_ds = 0.0018 * (fghz**2.8) * (d**2) / 4.3429    !  [3](14)   
 
                 ! absorption coefficient of dry snow
-                b_ds = (eps_ds_i / eps_ds_r)**2
+                b_ds = (eps_ds_i / eps_ds_r)**2                              
                 ka_ds = 2 * omega * sqrt(mu0 * eps_0 * eps_ds_r) * &
-                    sqrt(b_ds / (2 * (sqrt(1 + b_ds**2) + 1)))
+                    sqrt(b_ds / (2 * (sqrt(1 + b_ds) + 1)))              
+
                 IF (ke_ds < ka_ds) THEN
-                    ke_ds = ka_ds
+                    ke_ds = ka_ds                                          
                 ENDIF
 
                 ! absorption coefficient of wet snow
                 b_ws = (eps_ws_i / eps_ws_r)**2
-                ka_ws = 2 * omega * sqrt(mu0 * eps_0 * eps_ws_r) * &
-                    sqrt(b_ws / (2 * (sqrt(1 + b_ws**2) + 1)))
+                ka_ws = 2 * omega * sqrt(mu0 * eps_0 * eps_ws_r) * &        
+                    sqrt(b_ws / (2 * (sqrt(1 + b_ws) + 1)))
 
                 ! total extinction (assuming scattering is the same for dry and wet snow)
-                ke = (ke_ds - ka_ds) + ka_ws
+                ke = (ke_ds - ka_ds) + ka_ws                                
 
                 ! scattering coefficient of dry and wet snow
-                ks = ke_ds - ka_ds
+                ks = ke_ds - ka_ds                                          
 
-                ! calculate extinction coefficient of snow (pp.242, eq.4.157)
-                l2 = exp((ke - q * ks) * snowdp / cos(theta))
+                ! calculate extinction coefficient of snow ([4] pp.242, eq.4.157)
+                l2 = exp((ke - q * ks) * snowdp / cos(theta_s))                ! l2 = l2apu under some condition; 
 
-                ! brightness temperature through snow-air layer (pp.243, eq.4.161)
-                tb_2 = (1 + r_sn(i) / l2) * (1 - r_sa) * t_snow  * &
+                ! brightness temperature through snow-air layer ([4] pp.243, eq.4.161)
+                tb_2 = (1 + r_sn(i) / l2) * (1 - r_sa) * t_snow  * &         
                     (ka_ws / (ke - q * ks)) * (1 - 1 / l2) / &
-                    (1 - r_sn(i) * r_sa / l2**2) 
+                    (1 - r_sn(i) * r_sa / l2**2)
 
-                ! brightness temperature through soil-snow layer (pp.243, eq.4.162)
-                tb_3 = ((1 - r_sn(i)) * (1 - r_sa) * t) / &
+                ! brightness temperature through soil-snow layer ([4] pp.243, eq.4.162)
+                tb_3 = ((1 - r_sn(i)) * (1 - r_sa) * t) / &                 
                     (l2 * (1 - r_sn(i) * r_sa / l2**2))
 
                 ! brightness temperature of snow-cover ground
-                tb_tos = tb_2 + tb_3
+                tb_tos(i) = tb_2 + tb_3                                
 
                 ! emission by layers 2 (snow) and 3 (soil)
-                r_snow(i) = 1 - (tb_2/t_snow + tb_3/t)
+                r_snow(i) = 1 - (tb_2/t_snow + tb_3/t)         
 
             ENDDO
         ELSE
@@ -604,26 +631,31 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE eff_soil_temp (lb, wliq_soisno, t_soisno, t_eff)
-        
+    SUBROUTINE eff_soil_temp (wliq_soisno, t_soisno, t_eff)         
+
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate the effective temperature of soil
 !
 ! REFERENCES:
-!   Choudhury, B. J., Schmugge, T. J., & Mo, T. (1982). A parameterization 
-!   of effective soil temperature for microwave emission. 
-!   Journal of Geophysical Research: Oceans, 87(C2), 1301-1304.
-!   https://doi.org/10.1029/JC087iC02p01301
+!   [1] Choudhury, B. J., Schmugge, T. J., & Mo, T. (1982). A parameterization 
+!       of effective soil temperature for microwave emission. 
+!       Journal of Geophysical Research: Oceans, 87(C2), 1301-1304.
+!       https://doi.org/10.1029/JC087iC02p01301
+!   [2] Wigneron, J.-P., L. Laguerre, and Y. Kerr (2001), A simple parmeterization 
+!       of the L-band microwave emission from rough agricultural soils, IEEE Trans. 
+!       Geosci. Remote. Sens., 39, 1697–1707.                            
+!   [3] Wigneron et al., 2007, "L-band Microwave Emission of the Biosphere (L-MEB) Model:
+!       Description and calibration against experimental
+!       data sets over crop fields" Remote Sensing of Environment. Vol. 107, pp. 639-655k
 !-----------------------------------------------------------------------
     USE MOD_Precision
     IMPLICIT NONE
 
-! ------------------------ Dummy Argument ------------------------------
-    integer, intent(in)   :: lb                       
-    real(r8), intent(in)  :: wliq_soisno   (lb:nl_soil)   ! soil moisture (m3/m3)
-    real(r8), intent(in)  :: t_soisno (lb:nl_soil)   ! soil temperature (K) or glacier temperature
-    real(r8), intent(out) :: t_eff(2)                ! effective temperature for H and V polarizations
+! ------------------------ Dummy Argument ------------------------------           
+    real(r8), intent(in)  :: wliq_soisno   (1:nl_soil)   ! soil moisture (m3/m3)
+    real(r8), intent(in)  :: t_soisno (1:nl_soil)        ! soil temperature (K) or glacier temperature
+    real(r8), intent(out) :: t_eff(2)                    ! effective temperature for H and V polarizations, [K]
 
 !----------------------- Local Variables -------------------------------
     real(r8) :: wc_surf       ! soil moisture in the top 3cm (default in L-MEB)
@@ -635,7 +667,7 @@ CONTAINS
                               ! soil moisture increase, C large, teff close to tsurf
                               ! soil moisture decrease, C small, tdeep impact teff more
     real(r8) :: w0 = 0.41     ! parameter (f(texture))
-    real(r8) :: bw = 0.266    ! parameter (f(texture))
+    real(r8) :: bw = 0.266    ! parameter (f(texture)), another value to choose is 0.35 in ceme yomcmemtypes.F90:24
 !-----------------------------------------------------------------------
 
         wc_surf = (wliq_soisno(1)*0.0175 + wliq_soisno(2)*(0.03-0.0175))/0.03
@@ -644,8 +676,8 @@ CONTAINS
                 t_soisno(4)*(0.1655-0.0906) + t_soisno(5)*(0.2891-0.1655) + t_soisno(6)*(0.4929-0.2891) + &
                 t_soisno(7)*(0.5-0.4929))/0.5
 
-        C = max(0.01, (wc_surf/w0) ** bw)
-        t_eff(:) = t_deep + (t_surf - t_deep) * C
+        C = max(0.001, (wc_surf/w0) ** bw)                !  [2](7)    [3](12),    the SMAP use a constant value 0.246
+        t_eff(:) = t_deep + (t_surf - t_deep) * C         !  [2](8)    [3](11)
     
     END SUBROUTINE eff_soil_temp
 
@@ -653,17 +685,17 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE diel_soil (is_desert, lb, t_soisno, h2osoi, liq_h2osoi, vf_sand, vf_clay, BD_all, porsl, eps)
+    SUBROUTINE diel_soil (is_desert, t_soisno, h2osoi, liq_h2osoi, vf_sand, vf_clay, BD_all, porsl, eps)    
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate the dielectric constant of a wet soil
 !
 ! REFERENCES:
-!   Matzler, C. (1998). Microwave permittivity of dry sand. 
+!   [1]  Matzler, C. (1998). Microwave permittivity of dry sand. 
 !   IEEE Transactions on Geoscience and Remote Sensing, 36(1), 317-319.
 !       
-!   Wang and Schmugge, 1980: An empirical model for the
+!   [2]  Wang and Schmugge, 1980: An empirical model for the
 !   complex dielectric permittivity of soils as a function of water
 !   content. IEEE Trans. Geosci. Rem. Sens., GE-18, No. 4, 288-295.
 !-----------------------------------------------------------------------
@@ -673,10 +705,9 @@ CONTAINS
 
 ! ------------------------ Dummy Argument ------------------------------
     logical, intent(in)   :: is_desert              ! flag for desert soil
-    integer, intent(in)   :: lb                     ! 
-    real(r8), intent(in)  :: t_soisno(lb:nl_soil)   ! soil temperature (K) or glacier temperature
-    real(r8), intent(in)  :: h2osoi  (lb:nl_soil)   ! soil moisture (m3/m3)
-    real(r8), intent(in)  :: liq_h2osoi(lb:nl_soil) ! liquid water content of soil (m3/m3)
+    real(r8), intent(in)  :: t_soisno(1:nl_soil)   ! soil temperature (K) or glacier temperature
+    real(r8), intent(in)  :: h2osoi  (1:nl_soil)   ! soil moisture (m3/m3)
+    real(r8), intent(in)  :: liq_h2osoi(1:nl_soil) ! liquid water content of soil (m3/m3)
     real(r8), intent(in)  :: vf_sand (nl_soil)      ! sand volume fraction
     real(r8), intent(in)  :: vf_clay (nl_soil)      ! clay volume fraction
     real(r8), intent(in)  :: BD_all  (nl_soil)      ! bulk density of soil (kg/m3)
@@ -695,60 +726,60 @@ CONTAINS
     real(r8) :: alpha                    ! conductivity loss parameter
     real(r8) :: sal_sea = 32.5           ! sea water salinity (psu)
     real(r8) :: sal_soil = 0.0           ! soil salinity (psu)
-    complex(r8) :: eps_x                 ! dielectric constant of the initially absorbed water
-    complex(r8) :: eps_w                 ! dielectric constant of water
-    complex(r8) :: eps_a = (1.0, 0.0)    ! dielectric constant of air 
-    complex(r8) :: eps_r = (5.5, 0.2)    ! dielectric constant of rock
-    complex(r8) :: eps_i = (3.2, 0.1)    ! dielectric constant of ice
-    complex(r8) :: eps_f = (5.0, 0.5)    ! dielectric constant of frozen soil
+    complex(r8) :: eps_x                 ! dielectric constant of the initially absorbed water   初始吸收的水的介电常数
+    complex(r8) :: eps_w                 ! dielectric constant of water            水的介电常数
+    complex(r8) :: eps_a = (1.0, 0.0)    ! dielectric constant of air,  [2]IV      大气的介电常数
+    complex(r8) :: eps_r = (5.5, 0.2)    ! dielectric constant of rock, [2]IV      岩石的介电常数
+    complex(r8) :: eps_i = (3.2, 0.1)    ! dielectric constant of ice,  [2]IV      冰的介电常数
+    complex(r8) :: eps_f = (5.0, 0.5)    ! dielectric constant of frozen soil      冻土的介电常数
 
 !-----------------------------------------------------------------------
 
         DO j = 1, nl_soil
             ! temperature and moisture at the soil layer
-            tc = t_soisno(j) - tfrz  ! (celsius)
-            wc = h2osoi(j) 
+            tc = t_soisno(j) - tfrz  ! (celsius)    
+            wc = h2osoi(j)                          
 
             IF (is_desert) THEN
                 ! Microwave 1-10GHz permittivity of dry sand (matzler '98, eq.1) 
-                eps(j) = 2.53 + (2.79-2.53) / (1 - jj*(fghz/0.27)) + jj*0.002 
+                eps(j) = 2.53 + (2.79-2.53) / (1 - jj*(fghz/0.27)) + jj*0.002    !  [1](1) 
             ELSE
                 IF (tc < -0.5) THEN ! assume all freeze
                     ! calculate dielectric constant of pure ice
-                    CALL diel_ice (tc, eps_w)                
+                    CALL diel_ice (tc, eps_w)
                 ELSE
                     ! calculate dielectric constant of soil-water
-                    CALL diel_water (2, wc, tc, vf_sand(j), vf_clay(j), BD_all(j), sal_soil, eps_w)
+                    CALL diel_water (2, wc, tc, vf_sand(j), vf_clay(j), BD_all(j), sal_soil, eps_w)     
                 ENDIF
 
                 ! calculate wilting point at the soil layer
-                wp = 0.06774 - 0.00064 * vf_sand(j) + 0.00478 * vf_clay(j)
+                wp = 0.06774 - 0.00064 * vf_sand(j) + 0.00478 * vf_clay(j)      !  [2](1)
 
                 ! calculate fitting parameters
-                gamma = -0.57 * wp + 0.481
+                gamma = -0.57 * wp + 0.481                                      !  [2](8)
 
                 ! calculate transition moisture point
-                wt = 0.49 * wp + 0.165
+                wt = 0.49 * wp + 0.165                                          !  [2](9)
 
                 ! calculate dielectric constant of wet soil (when all soil freeze, eps_x = eps_i)
                 ! (NOTE): use soil moisture (ice+liquid) to calculate dielectric constant
                 IF (wc <= wt) THEN
-                    eps_x = eps_i + (eps_w-eps_i) * (wc/wt) * gamma
-                    eps(j) = wc * eps_x + (porsl(j)-wc) * eps_a + (1.-porsl(j)) * eps_r
+                    eps_x = eps_i + (eps_w-eps_i) * (wc/wt) * gamma             !  [2](3)
+                    eps(j) = wc * eps_x + (porsl(j)-wc) * eps_a + (1.-porsl(j)) * eps_r                       !  [2](2)
                 ELSE
-                    eps_x = eps_i + (eps_w-eps_i) * gamma
-                    eps(j) = wt * eps_x + (wc-wt) * eps_w + (porsl(j)-wc) * eps_a + (1.-porsl(j)) * eps_r
+                    eps_x = eps_i + (eps_w-eps_i) * gamma                       !  [2](5)
+                    eps(j) = wt * eps_x + (wc-wt) * eps_w + (porsl(j)-wc) * eps_a + (1.-porsl(j)) * eps_r     !  [2](4)
                 ENDIF
 
                 ! add conductivity loss for imaginary part
                 alpha = min(100. * wp, 26.)
-                ecl = alpha * wc**2
-                eps(j) = eps(j) + jj*ecl
+                ecl = alpha * wc**2                              !  [2](6)
+                eps(j) = eps(j) + jj*ecl                         !  [2](6)
             ENDIF
 
             ! mix dielectric constant of frozen and non-frozen soil
             ffrz = 1 - (liq_h2osoi(j) / h2osoi(j))
-            eps(j) = eps(j) * (1.-ffrz) + eps_f * ffrz
+            eps(j) = eps(j) * (1.-ffrz) + eps_f * ffrz          
             
         ENDDO
 
@@ -758,14 +789,14 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE diel_ice (t, eps_i)
+    SUBROUTINE diel_ice (t, eps_i)   
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate dielectric constant of pure ice
 !
 ! REFERENCES:
-!   Matzler, C. (2006). Thermal Microwave Radiation: Applications for Remote Sensing p456-461
+!   [1] Matzler, C. (2006). Thermal Microwave Radiation: Applications for Remote Sensing p456-461
 !-----------------------------------------------------------------------
     USE MOD_Const_Physical
     USE MOD_Precision
@@ -780,32 +811,34 @@ CONTAINS
     real(r8) :: dbeta                ! corrected delta beta parameter
     real(r8) :: beta                 ! beta parameter
     real(r8) :: t_inv                ! modified inverse temperature
+    real(r8) :: t_K                  ! temperature (K)
     real(r8) :: alpha                ! alpha parameter
     real(r8) :: eps_i_r              ! real part of pure ice dielectric constant
     real(r8) :: eps_i_i              ! imaginary part of pure ice dielectric constant
 !-----------------------------------------------------------------------
 
+        t_K = t + tfrz
         ! eq.(5.33): calculate beta parameter by Mishima et al. (1983) 
-        betam = (0.0207/t) * (exp(335./t)/(exp(335./t)-1.)**2.) + 1.16e-11*(fghz**2.)
+        betam = (0.0207/t_K) * (exp(335./t_K)/((exp(335./t_K)-1.)**2.)) + 1.16e-11*(fghz**2.)      !  [1](5.33)
 
         ! eq.(5.35): calculate delta beta parameter
-        dbeta = exp(-9.963 + 0.0372 * t)
+        dbeta = exp(-9.963 + 0.0372 * t)           !  [1](5.35)
 
         ! eq.(5.34): calculate beta parameter
-        beta = betam + dbeta
+        beta = betam + dbeta                       !  [1](5.34)
 
         ! eq.(5.32): calculate alpha parameter
-        t_inv = 300./t - 1. ! modified inverse temperature
-        alpha = (0.00504 + 0.0062 * t_inv) * exp(-22.1 * t_inv) !(GHz)
+        t_inv = 300./t_K -1                        !  [1](p.457)
+        alpha = (0.00504 + 0.0062 * t_inv) * exp(-22.1 * t_inv) !(GHz)   !  [1](5.32)
 
         ! eq.(5.30): calculate real part of pure ice dielectric constant
-        eps_i_r = 3.1884 + 9.1e-4 * t
+        eps_i_r = 3.1884 + 9.1e-4 * t              !  [1](5.30)
 
         ! eq.(5.31): calculate imaginary part of pure ice dielectric constant
-        eps_i_i = alpha/fghz + beta*fghz
+        eps_i_i = alpha/fghz + beta*fghz           !  [1](5.31)
 
         ! calculate dielectric constant of pure ice
-        eps_i = eps_i_r - jj*eps_i_i
+        eps_i = eps_i_r - jj*eps_i_i               !  [1](5.31)          
 
     END SUBROUTINE diel_ice
 
@@ -843,14 +876,14 @@ CONTAINS
     IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-    integer, intent(in)   :: type          ! type of water, 0: pure water, 
+    integer, intent(in)      :: type       ! type of water, 0: pure water, 
                                            !                1: sea water, 2: soil water
-    real(r8), intent(in)  :: swc           ! soil water content (m3/m3)
-    real(r8), intent(in)  :: t             ! soil temperature (C)
-    real(r8), intent(in)  :: vf_sand       ! sand volume fraction
-    real(r8), intent(in)  :: vf_clay       ! clay volume fraction
-    real(r8), intent(in)  :: BD_all        ! bulk density (g/cm3)
-    real(r8), intent(in)  :: sal           ! water salinity (psu)
+    real(r8), intent(inout)  :: swc        ! soil water content (m3/m3)
+    real(r8), intent(in)     :: t          ! soil temperature (C)
+    real(r8), intent(in)     :: vf_sand    ! sand volume fraction
+    real(r8), intent(in)     :: vf_clay    ! clay volume fraction
+    real(r8), intent(in)     :: BD_all     ! bulk density (g/cm3)
+    real(r8), intent(in)     :: sal        ! water salinity (psu)
     complex(r8), intent(out) :: eps_w      ! dielectric constant of soil water
 
 !----------------------- Local Variables -------------------------------
@@ -863,30 +896,30 @@ CONTAINS
 
         ! [3] eq.16: tau(T, sal) = tau_w(T) * b(sal, T)
         ! calculate relaxation time of pure water (Stogryn)
-        tau_w = 1.768e-11  - 6.068e-13 * t  + 1.104e-14 * t**2  - 8.111e-17 * t**3
-        b = 1.000 + 2.282e-5*sal*t - 7.638e-4*sal - 7.760e-6*sal**2 + 1.105e-8*sal**3 
-        tau_w = tau_w * b 
+        tau_w = 1.768e-11  - 6.068e-13 * t  + 1.104e-14 * t**2  - 8.111e-17 * t**3      !   [3](17)
+        b = 1.000 + 2.282e-5*sal*t - 7.638e-4*sal - 7.760e-6*sal**2 + 1.105e-8*sal**3   !   [3](18)
+        tau_w = tau_w * b                                                               !   [3](16)      
 
         ! [3] eq.13: eps_w0(sal, T) = eps_w0(T) * a(sal, T)
         ! static dielectric constant of pure water (Klein and Swift)
-        eps_w0 = 87.134  - 1.949e-1 * t - 1.276e-2 * t**2 + 2.491e-4 * t**3             
-        a = 1.000 + 1.613e-5*sal*t - 3.656e-3*sal + 3.210e-5*sal**2 - 4.232e-7*sal**3  
-        eps_w0 = eps_w0 * a       
+        eps_w0 = 87.134  - 1.949e-1 * t - 1.276e-2 * t**2 + 2.491e-4 * t**3            !   [3](14)
+        a = 1.000 + 1.613e-5*sal*t - 3.656e-3*sal + 3.210e-5*sal**2 - 4.232e-7*sal**3  !   [3](15)
+        eps_w0 = eps_w0 * a                                                            !   [3](13)
 
         IF (type == 0) THEN  ! pure water
             ! [1] eq.19
             eps_w0 = 88.045 - 0.4147 * t  + 6.295e-4 * t**2  + 1.075e-5 * t**3
-            eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w) 
+            eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w)              
 
         ELSEIF (type == 1) THEN  ! sea water
             ! calculate ionic conductivity [1] eq.27, eq.28
             sigma = sal * (0.182521 - 1.46192e-3 * sal + 2.09324e-5 * sal**2 - 1.28205e-7 * sal**3) &
-                * exp(-1. * (25 - t) * &
+                * exp(-1. * (25-t) * &
                 (2.033e-2 + 1.266e-4 * (25-t) + 2.464e-6 * (25-t)**2  &
                 - sal * (1.849e-5 - 2.551e-7 * (25-t) + 2.551e-8 * (25-t)**2)))
 
             ! diel constant of sea water [1] eq.21
-            eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w) + jj*sigma/(omega*eps_0) 
+            eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w) + jj*sigma/(omega*eps_0)     
         ELSE  
             ! calculate soil conductivity
             sigma = -1.645 + 1.939 * BD_all - 0.02256 * vf_sand + 0.01594 * vf_clay
@@ -895,6 +928,7 @@ CONTAINS
             ENDIF
 
             ! calculate dielectric constant of soil-water by modified Debye expression
+            swc = max(0.001, swc)      
             eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w)  &
                     + jj*sigma/(omega*eps_w0)*(rho_soil-BD_all)/(rho_soil*swc)
         ENDIF
@@ -905,32 +939,32 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE smooth_reflectivity (eps_surf, r_s)
+    SUBROUTINE smooth_reflectivity (eps_surf, r_s)       
     
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate the smooth surface reflectivity by Fresnel Law
 !
 ! REFERENCES:
-!   Njoku and Kong, 1977: Theory for passive microwave remote sensing
-!   of near-surface soil moisture. Journal of Geophysical Research,
-!   Vol. 82, No. 20, 3108-3118.
+!   [1] Njoku and Kong, 1977: Theory for passive microwave remote sensing
+!       of near-surface soil moisture. Journal of Geophysical Research,
+!       Vol. 82, No. 20, 3108-3118.
 !-----------------------------------------------------------------------
     USE MOD_Precision
     IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-    complex(r8), intent(in) :: eps_surf     ! dielectric constant of the surface
-    real(r8), intent(out) :: r_s(2)         ! reflectivities of flat surfaces for H and V polarizations
+    complex(r8), intent(in) :: eps_surf       ! dielectric constant of the surface
+    real(r8), intent(out)   :: r_s(2)         ! reflectivities of flat surfaces for H and V polarizations
 
 !----------------------- Local Variables -------------------------------
     complex(r8) :: g                        ! parameter in Fresnel Law
 
 !-----------------------------------------------------------------------
 
-        g = sqrt(eps_surf - sin(theta)**2)
-        r_s(1) = abs((cos(theta)-g)/(cos(theta)+g)) ** 2.
-        r_s(2) = abs((cos(theta)*eps_surf-g)/(cos(theta)*eps_surf+g)) ** 2.
+        g = sqrt(eps_surf - sin(theta)**2)                                     !   [1]p4   
+        r_s(1) = abs((cos(theta)-g)/(cos(theta)+g)) ** 2.                      !   [1]p4 
+        r_s(2) = abs((cos(theta)*eps_surf-g)/(cos(theta)*eps_surf+g)) ** 2.    !   [1]p4
     
     END SUBROUTINE smooth_reflectivity
 
@@ -938,19 +972,23 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-    SUBROUTINE rough_reflectivity (is_desert, patchclass, r_s, r_r)
+    SUBROUTINE rough_reflectivity (is_desert, patchclass, r_s, r_r)      
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !   Calculate the rough surface reflectivity
 !
 ! REFERENCES:
-!   Choudhury et al., 1979: Effect of surface roughness on the
-!   microwave emission from soils, J.Geo.Res. Vol.84, 5699-5706
+!   [1] Kerr and Njokui, 1990: A Semiempirical Model For Interpreting Microwave
+!       Emission From Semiarid Land Surfaces as Seen From Space
+!       IEEE Trans. Geosci. Rem. Sens., Vol.28, No.3, 384-393.
 !
-!   Wang and Choudhury, 1981: Remote sensing of soil moisture
-!   content over bare field at 1.4 GHz frequency, J.Geo.Res.
-!   Vol.86, 5277-5287
+!   [2] Choudhury et al., 1979: Effect of surface roughness on the
+!       microwave emission from soils, J.Geo.Res. Vol.84, 5699-5706
+!
+!   [3] Wang and Choudhury, 1981: Remote sensing of soil moisture
+!       content over bare field at 1.4 GHz frequency, J.Geo.Res.
+!       Vol.86, 5277-5287
 !-----------------------------------------------------------------------
     USE MOD_Precision
     IMPLICIT NONE
@@ -971,17 +1009,19 @@ CONTAINS
             r_r = r_s
         ELSE
             ! calculate parameter for polarization mixing due to surface roughness
-            Q = 0.35 * (1.0 - exp(-0.6 * rgh_surf**2 * fghz)) ! [1](16)
             IF (fghz < 2.) THEN
                 Q = 0. ! Q is assumed zero at low frequency
+            ELSE
+                Q = 0.35 * (1.0 - exp(-0.6 * rgh_surf**2 * fghz))     !    [1](16)
             ENDIF
 
             ! calculate rough surface reflectivity
-            r_r(1) = (Q * r_s(2) + (1.-Q) * r_s(1)) * exp(-hr(patchclass) * cos(theta)**nrh(patchclass))
-            r_r(2) = (Q * r_s(1) + (1.-Q) * r_s(2)) * exp(-hr(patchclass) * cos(theta)**nrv(patchclass))
+            r_r(1) = (Q * r_s(2) + (1.-Q) * r_s(1)) * exp(-hr(patchclass) * cos(theta)**nrh(patchclass))     !  [1](6)      
+            r_r(2) = (Q * r_s(1) + (1.-Q) * r_s(2)) * exp(-hr(patchclass) * cos(theta)**nrv(patchclass))     !  [1](6)
         ENDIF
 
     END SUBROUTINE rough_reflectivity
+
 
 END MODULE MOD_DA_ObsOperator
 #endif

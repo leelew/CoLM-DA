@@ -128,6 +128,8 @@ CONTAINS
       USE MOD_Forcing, only: forcmask_pch
 #ifdef DataAssimilation
       USE MOD_DA_GRACE, only : fslp_k_mon
+      use MOD_Vars_Global, only: num_ens    
+      use MOD_DA_SMAP, only: pred_tb_h_out, smap_tb_h_out, pred_tb_v_out, smap_tb_v_out    
 #endif
 
       IMPLICIT NONE
@@ -161,6 +163,10 @@ CONTAINS
       integer i, u
 #ifdef URBAN_MODEL
       logical,  allocatable ::  filter_urb (:)
+#endif
+
+#ifdef DataAssimilation
+      character(len=50)   ::  num_str, varname       
 #endif
 
       IF (itstamp <= ptstamp) THEN
@@ -3549,6 +3555,74 @@ CONTAINS
          CALL write_history_variable_3d ( DEF_hist_vars%wliq_soisno, &
             a_wliq_soisno, file_hist, 'f_wliq_soisno', itime_in_file, 'soilsnow', maxsnl+1, nl_soil-maxsnl, &
             sumarea, filter,'liquid water in soil layers','kg/m2')
+
+#ifdef DataAssimilation
+         ! the brightness temperature of the soil surface [K]
+         if (allocated(smap_tb_h_out)) then          !  should be allocated function, for it may have not obs in this moment and it will not be allocated
+            u = findloc(smap_tb_h_out(:, 1) > 0.0d0, value=.true., back=.true., dim=1)
+            if (u >= 1) then
+               do i=1, u
+                  write(num_str, '(I0)') i 
+                  varname = 'f_smap_tb_h_out_' // trim(num_str)
+                  call write_history_variable_2d (.true., smap_tb_h_out(i, :), file_hist, &
+                        varname, itime_in_file, sumarea, filter, &
+                        'the obser brightness temperature of the soil surface', 'K')
+                  varname = 'f_pred_tb_h_out_' // trim(num_str)
+                  call write_history_variable_3d (.true., pred_tb_h_out(i, :, :), file_hist, &
+                        varname, itime_in_file, 'ens', 1, num_ens, sumarea, &
+                        filter, "the predicted H- polarized temp of the soil surface", 'K')
+                  varname = 'f_smap_tb_v_out_' // trim(num_str)
+                  call write_history_variable_2d (.true., smap_tb_v_out(i, :), file_hist, &
+                        varname, itime_in_file, sumarea, filter, &
+                        'the obser brightness temperature of the soil surface', 'K')
+                  varname = 'f_pred_tb_v_out_' // trim(num_str)
+                  call write_history_variable_3d (.true., pred_tb_v_out(i, :, :), file_hist, &
+                        varname, itime_in_file, 'ens', 1, num_ens, sumarea, &
+                        filter, "the predicted H- polarized temp of the soil surface", 'K')
+               end do
+            else
+               smap_tb_h_out = 0.0d0
+               pred_tb_h_out = 0.0d0
+               smap_tb_v_out = 0.0d0
+               pred_tb_v_out = 0.0d0
+               call write_history_variable_2d (.true., smap_tb_h_out(1, :), file_hist, &
+                        'f_smap_tb_h_out_1', itime_in_file, sumarea, filter, &
+                        'the obser brightness temperature of the soil surface', 'K')
+               call write_history_variable_3d (.true., pred_tb_h_out(1, :, :), file_hist, &
+                        'f_pred_tb_h_out_1', itime_in_file, 'ens', 1, num_ens, sumarea, &
+                        filter, "the predicted H- polarized temp of the soil surface", 'K')
+               call write_history_variable_2d (.true., smap_tb_v_out(1, :), file_hist, &
+                        'f_smap_tb_v_out_1', itime_in_file, sumarea, filter, &
+                        'the obser brightness temperature of the soil surface', 'K')
+               call write_history_variable_3d (.true., pred_tb_v_out(1, :, :), file_hist, &
+                        'f_pred_tb_v_out_1', itime_in_file, 'ens', 1, num_ens, sumarea, &
+                        filter, "the predicted H- polarized temp of the soil surface", 'K')
+            end if
+         else
+            allocate(smap_tb_h_out(1, numpatch))
+            allocate(pred_tb_h_out(1, num_ens, numpatch))
+            allocate(smap_tb_v_out(1, numpatch))
+            allocate(pred_tb_v_out(1, num_ens, numpatch))
+            smap_tb_h_out = 0.0d0
+            pred_tb_h_out = 0.0d0
+            smap_tb_v_out = 0.0d0
+            pred_tb_v_out = 0.0d0
+            call write_history_variable_2d (.true., smap_tb_h_out(1, :), file_hist, &
+                     'f_smap_tb_h_out_1', itime_in_file, sumarea, filter, &
+                     'the obser brightness temperature of the soil surface', 'K')
+            call write_history_variable_3d (.true., pred_tb_h_out(1, :, :), file_hist, &
+                     'f_pred_tb_h_out_1', itime_in_file, 'ens', 1, num_ens, sumarea, &
+                     filter, "the predicted H- polarized temp of the soil surface", 'K')
+            deallocate(smap_tb_h_out, pred_tb_h_out)
+            call write_history_variable_2d (.true., smap_tb_v_out(1, :), file_hist, &
+                     'f_smap_tb_v_out_1', itime_in_file, sumarea, filter, &
+                     'the obser brightness temperature of the soil surface', 'K')
+            call write_history_variable_3d (.true., pred_tb_v_out(1, :, :), file_hist, &
+                     'f_pred_tb_v_out_1', itime_in_file, 'ens', 1, num_ens, sumarea, &
+                     filter, "the predicted H- polarized temp of the soil surface", 'K')
+            deallocate(smap_tb_v_out, pred_tb_v_out)
+         end if
+#endif
 
          ! ice lens in soil layers [kg/m2]
          CALL write_history_variable_3d ( DEF_hist_vars%wice_soisno, &

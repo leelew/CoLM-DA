@@ -8,6 +8,7 @@ MODULE MOD_DA_SMAP
 ! 
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial version, based on SMAP L1C TB data
+!   Zhilong Fan, Lu Li, 03/2024: Debug and clean codes
 !-----------------------------------------------------------------------------
     USE MOD_DataType
     USE MOD_SpatialMapping
@@ -23,6 +24,12 @@ MODULE MOD_DA_SMAP
     PUBLIC :: init_DA_SMAP
     PUBLIC :: run_DA_SMAP
     PUBLIC :: end_DA_SMAP
+
+    ! use for save predicted obs and obs
+    real(r8), allocatable, public :: pred_tb_h_out(:,:,:)    
+    real(r8), allocatable, public :: smap_tb_h_out(:,:)       
+    real(r8), allocatable, public :: pred_tb_v_out(:,:,:)    
+    real(r8), allocatable, public :: smap_tb_v_out(:,:)       
 
     PRIVATE
 
@@ -104,7 +111,6 @@ MODULE MOD_DA_SMAP
     real(r8), parameter   :: loc_r = 1.0                      ! localization radius 
     real(r8), parameter   :: infl = 1.2                       ! inflation factor
     real(r8) :: trans(num_ens, num_ens)                       ! transform matrix on each patch
-
 
 !-----------------------------------------------------------------------------
 
@@ -188,7 +194,7 @@ CONTAINS
         has_obs = .false.
         IF (has_file) THEN
             CALL ncio_read_bcast_serial (file_smap, 'time', smap_time)
-            num_obs = size(smap_time) 
+            num_obs = size(smap_time)
             idate_b = idate(3)
             idate_e = idate(3) + deltim
             allocate (dt_b(num_obs))
@@ -245,6 +251,7 @@ CONTAINS
 
             ! forward model
             IF (p_is_worker) THEN
+                print *, month, mday, hour
                 DO iens = 1, num_ens
                     DO np = 1, numpatch
                         CALL forward ( &
@@ -262,11 +269,11 @@ CONTAINS
             ! mapping predicted observations from patch to world grid
             CALL allocate_block_data (grid_smap, pred_tb_h_wgrid_ens, num_ens) 
             CALL allocate_block_data (grid_smap, pred_tb_v_wgrid_ens, num_ens)
-            CALL mg2p_smap%pset2grid (pred_tb_h_pset_ens, pred_tb_h_wgrid_ens) 
-            CALL mg2p_smap%pset2grid (pred_tb_v_pset_ens, pred_tb_v_wgrid_ens)
+            CALL mg2p_smap%pset2grid (pred_tb_h_pset_ens, pred_tb_h_wgrid_ens, spval)     
+            CALL mg2p_smap%pset2grid (pred_tb_v_pset_ens, pred_tb_v_wgrid_ens, spval)     
 
             ! calculate area of each patch across world grid
-            area_pset(:) = 1 
+            area_pset(:) = 1
             CALL allocate_block_data (grid_smap, area_wgrid)
             CALL mg2p_smap%pset2grid (area_pset, area_wgrid)
 
@@ -276,8 +283,8 @@ CONTAINS
                     ib = grid_smap%xblk(smap_jj(i)+1) !//TODO: Lu Li: python index starts from 0
                     jb = grid_smap%yblk(smap_ii(i)+1)
                     il = grid_smap%xloc(smap_jj(i)+1)
-                    jl = grid_smap%yloc(smap_ii(i)+1) 
-                    IF (ib == 0 .or. jb == 0) THEN  
+                    jl = grid_smap%yloc(smap_ii(i)+1)
+                    IF (ib == 0 .or. jb == 0) THEN
                         !//TODO: Lu Li: add explainations
                         pred_tb_h_ogrid_ens(i,:) = -9999.0
                         pred_tb_v_ogrid_ens(i,:) = -9999.0
@@ -288,14 +295,24 @@ CONTAINS
                             pred_tb_v_ogrid_ens(i,:) = -9999.0
                         ELSE
                             pred_tb_h_ogrid_ens(i,:) = (pred_tb_h_wgrid_ens%blk(ib, jb)%val(:, il, jl))/area_wgrid_obs
-                            pred_tb_v_ogrid_ens(i,:) = (pred_tb_v_wgrid_ens%blk(ib, jb)%val(:, il, jl))/area_wgrid_obs 
+                            pred_tb_v_ogrid_ens(i,:) = (pred_tb_v_wgrid_ens%blk(ib, jb)%val(:, il, jl))/area_wgrid_obs
                         ENDIF
                     ENDIF
                 ENDDO
-            ENDIF            
+            ENDIF
         
             ! data assimilation
             IF (p_is_worker) THEN
+                !//TODO: the maximum number of obs around each patch depends on the size of selected regions
+                allocate(pred_tb_h_out(5, num_ens, numpatch))   
+                allocate(smap_tb_h_out(5, numpatch))             
+                allocate(pred_tb_v_out(5, num_ens, numpatch))   
+                allocate(smap_tb_v_out(5, numpatch))            
+                pred_tb_h_out = -1.0d0
+                smap_tb_h_out = -1.0d0
+                pred_tb_v_out = -1.0d0
+                smap_tb_v_out = -1.0d0
+
                 DO np = 1, numpatch
                     ! regions info around target patch
                     lat_p_n = patchlatr(np)*180/pi + dres
@@ -304,7 +321,7 @@ CONTAINS
                     lon_p_e = patchlonr(np)*180/pi + dres
 
                     ! get the index of obs around target patch and time at current step
-                    allocate (obs_index (0))
+                    allocate (obs_index (0))             
                     DO iobs = 1, num_obs
                         IF (smap_lat(iobs) < lat_p_n       .and. smap_lat(iobs) > lat_p_s       .and. &
                             smap_lon(iobs) > lon_p_w       .and. smap_lon(iobs) < lon_p_e       .and. &
@@ -346,15 +363,15 @@ CONTAINS
                     IF (num_obs_loc_nonan > 0) THEN
                         allocate (smap_tb_h_loc_nonan     (num_obs_loc_nonan))
                         allocate (smap_tb_v_loc_nonan     (num_obs_loc_nonan))
-                        allocate (pred_tb_h_loc_nonan_ens (num_obs_loc_nonan,num_ens))
-                        allocate (pred_tb_v_loc_nonan_ens (num_obs_loc_nonan,num_ens))
+                        allocate (pred_tb_h_loc_nonan_ens (num_obs_loc_nonan, num_ens))
+                        allocate (pred_tb_v_loc_nonan_ens (num_obs_loc_nonan, num_ens))
                         allocate (d_loc_nonan             (num_obs_loc_nonan))
                         allocate (obs_err                 (num_obs_loc_nonan))
                         smap_tb_h_loc_nonan = pack(smap_tb_h_loc, pred_tb_h_loc_ens(:,1) > 0)
                         smap_tb_v_loc_nonan = pack(smap_tb_v_loc, pred_tb_h_loc_ens(:,1) > 0)
                         DO i = 1, num_ens
                             pred_tb_h_loc_nonan_ens(:,i) = pack(pred_tb_h_loc_ens(:,i), pred_tb_h_loc_ens(:,1) > 0)
-                            pred_tb_v_loc_nonan_ens(:,i) = pack(pred_tb_v_loc_ens(:,i), pred_tb_h_loc_ens(:,1) > 0)
+                            pred_tb_v_loc_nonan_ens(:,i) = pack(pred_tb_v_loc_ens(:,i), pred_tb_v_loc_ens(:,1) > 0)
                         ENDDO
                         d_loc_nonan = pack(d_loc, pred_tb_h_loc_ens(:,1) > 0)
                         obs_err(:) = 0.04   !//TODO: Lu Li: only for SMAP data
@@ -366,8 +383,23 @@ CONTAINS
                             h2osoi_ens(:,:,np), pred_tb_h_loc_nonan_ens, smap_tb_h_loc_nonan, &
                             obs_err, d_loc_nonan, loc_r, infl, &
                             h2osoi(:,np), trans, h2osoi_ens(:,:,np))
+        
+                        IF (wliq_soisno_ens(1, 1, np) /= spval) then
+                            DO i = 1, nl_soil
+                                wliq_soisno_ens(i, :, np) = matmul(trans, wliq_soisno_ens(i, :, np))
+                                wice_soisno_ens(i, :, np) = matmul(trans, wice_soisno_ens(i, :, np))
+                            ENDDO
+                        ENDIF
                     ELSE
                         print *, 'No avaliable obs for patch ', np
+                    ENDIF
+
+                    ! save predicted obs and obs
+                    IF (num_obs_loc_nonan > 0) THEN    
+                        pred_tb_h_out(1:num_obs_loc_nonan, :, np) = pred_tb_h_loc_nonan_ens(:, :)
+                        smap_tb_h_out(1:num_obs_loc_nonan, np)    = smap_tb_h_loc_nonan(:)
+                        pred_tb_v_out(1:num_obs_loc_nonan, :, np) = pred_tb_v_loc_nonan_ens(:, :)
+                        smap_tb_v_out(1:num_obs_loc_nonan, np)    = smap_tb_v_loc_nonan(:)
                     ENDIF
 
                     !//TODO: Lu Li: adjust land surface variables based on the updated transform matrix
@@ -394,14 +426,11 @@ CONTAINS
         
     END SUBROUTINE run_DA_SMAP
 
-
+!-----------------------------------------------------------------------------
 
 
 !-----------------------------------------------------------------------------
-
     SUBROUTINE end_DA_SMAP ()
-
-!-----------------------------------------------------------------------------
     IMPLICIT NONE
 
         IF (allocated(smap_time))               deallocate(smap_time)
